@@ -14,7 +14,7 @@ o	Uploads a PDF file for processing.
 o	Summarizes content and answers queries related to the document using OpenRouter APIs.
 4.	Image Search
 o	Generates images based on user-defined prompts.
-o	Offers an option to download generated images.
+o	Offers an option to download generated images using Flux.
 5.	Picture Explanation
 o	Uploads an image.
 o	Provides a detailed explanation of the image content based on user queries.
