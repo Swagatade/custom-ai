@@ -5,6 +5,8 @@ import os
 from duckduckgo_search import DDGS
 import webbrowser
 import PyPDF2
+from PIL import Image
+import io
 
 # API Configuration
 API_BASE_URL = "https://openrouter.ai/api/v1"
@@ -43,7 +45,7 @@ def file_preprocessing(file):
     return extract_pdf_text(file)
 
 # Model options for summarization
-model_options = ["meta-llama/llama-3.2-11b-vision-instruct:free", "meta-llama/llama-3.1-70b-instruct:free", "huggingfaceh4/zephyr-7b-beta:free"]
+model_options = ["meta-llama/llama-3.2-11b-vision-instruct:free", "meta-llama/llama-3.1-70b-instruct:free", "huggingfaceh4/zephyr-7b-beta:free", "microsoft/phi-3-mini-128k-instruct:free", "mistralai/mistral-7b-instruct:free", "qwen/qwen-2-7b-instruct:free", "openchat/openchat-7b:free", "google/learnlm-1.5-pro-experimental:free"]
 selected_model = st.sidebar.selectbox("Choose a Model", model_options)
 
 # Function to summarize a document and answer queries
@@ -56,7 +58,7 @@ def llm_pipeline(filepath, query):
             {"role": "system", "content": "You are an assistant summarizing a document."},
             {"role": "user", "content": f"Summarize the following text:\n{input_text}\nBased on the document, answer the question: {query}"}
         ],
-        "max_tokens": 10000
+        "max_tokens":10000
     }
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -135,6 +137,69 @@ def search_duckduckgo(query, max_results=10):
     except Exception as e:
         return [f"An error occurred: {e}"]
 
+# Function to download and display image
+def download_image(prompt, width=768, height=768, model='flux', seed=None):
+    url = f"https://image.pollinations.ai/prompt/{prompt}?width={width}&height={height}&model={model}&seed={seed}"
+    response = requests.get(url)
+    image_path = 'generated_image.jpg'
+    with open(image_path, 'wb') as file:
+        file.write(response.content)
+    return image_path
+
+# Function to summarize an image
+def summarize_image(image_path, query):
+    try:
+        # Convert image to JPG and ensure size is under 10MB
+        with Image.open(image_path) as img:
+            with io.BytesIO() as output:
+                img.save(output, format="JPEG", quality=95)
+                output_size = output.tell()
+                if output_size > 10 * 1024 * 1024:  # 10MB
+                    return "Error: Image size exceeds 10MB after conversion."
+                encoded_image = base64.b64encode(output.getvalue()).decode("utf-8")
+        
+        payload = {
+            "model": selected_model,
+            "messages": [
+                {"role": "system", "content": "You are an assistant providing a detailed description of an image."},
+                {"role": "user", "content": f"Describe the image in detail based on the following query: {query}\n{encoded_image}"}
+            ],
+            "max_tokens": 200
+        }
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+        }
+        response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+        if response.status_code == 200:
+            result = response.json()
+            if 'choices' in result:
+                description = result['choices'][0]['message']['content']
+                # Remove technical details from the description
+                description = description.split("9j/")[0]
+                return description
+            else:
+                return "Error: 'choices' not found in the response."
+        else:
+            return f"Error during summarization: {response.json().get('message', 'Unknown error')}"
+    except Exception as e:
+        return f"An error occurred: {e}"
+
+from PyPDF2 import PdfWriter, PdfReader
+
+# Function to compress PDF without reducing quality
+def compress_pdf(input_pdf_path, output_pdf_path):
+    try:
+        pdf_writer = PdfWriter()
+        with open(input_pdf_path, "rb") as input_pdf:
+            pdf_reader = PdfReader(input_pdf)
+            for page in pdf_reader.pages:
+                pdf_writer.add_page(page)
+            with open(output_pdf_path, "wb") as output_pdf:
+                pdf_writer.write(output_pdf)
+        return output_pdf_path
+    except Exception as e:
+        return f"Error compressing PDF: {e}"
+
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
 
@@ -162,10 +227,6 @@ if choice == "Query Processing":
             url = f"https://www.meta.ai"
             webbrowser.open(url)
             result = "Opened image search."
-        elif 'picture explain' in user_query.lower():
-            url = f"https://copilot.microsoft.com/i"
-            webbrowser.open(url)
-            result = "Opened picture explanation."
         else:
             payload = {
                 "model": "mistralai/mistral-7b-instruct:free",
@@ -203,15 +264,50 @@ elif choice == "Weather Information":
 
 elif choice == "Image Search":
     st.subheader("Image Search")
-    url = f"https://www.meta.ai"
-    webbrowser.open(url)
-    history.append(("Image Search", "N/A", "Opened image search."))
+    prompt = st.text_input("Enter a prompt for image generation:")
+    width = 768
+    height =768
+    model = "flux"
+    seed = st.number_input("Seed", value=42, step=1)
+
+    if st.button("Generate Image"):
+        image_path = download_image(prompt, width, height, model, seed)
+        st.image(image_path)
+        with open(image_path, "rb") as file:
+            btn = st.download_button(
+                label="Download Image",
+                data=file,
+                file_name="generated_image.jpg",
+                mime="image/jpeg"
+            )
+        history.append(("Image Search", prompt, image_path))
 
 elif choice == "Picture Explanation":
     st.subheader("Picture Explanation")
-    url = f"https://copilot.microsoft.com/i"
-    webbrowser.open(url)
-    history.append(("Picture Explanation", "N/A", "Opened picture explanation."))
+    uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+
+    if uploaded_image is not None:
+        image_path = os.path.join("temp_data", uploaded_image.name)
+        with open(image_path, "wb") as file:
+            file.write(uploaded_image.read())
+        
+        # Create two columns
+        col1, col2 = st.columns(2)
+        
+        # Display the uploaded image on the left
+        with col1:
+            st.image(image_path)
+        
+        # Display the summarized output on the right
+        with col2:
+            query = st.text_input("Enter your query about the image:")
+            if st.button("Generate Text"):
+                summary = summarize_image(image_path, query)
+                if "Error" in summary:
+                    st.error(summary)
+                else:
+                    st.write(summary)
+                history.append(("Picture Explanation", uploaded_image.name, summary))
 
 elif choice == "PDF Summarization":
     st.subheader("PDF Summarization")
@@ -224,31 +320,43 @@ elif choice == "PDF Summarization":
         filepath = os.path.join(temp_dir, uploaded_file.name)
         with open(filepath, "wb") as temp_file:
             temp_file.write(uploaded_file.read())
-        # Create two columns
-        col1, col2 = st.columns(2)
 
-        # Display the PDF on the left
-        with col1:
-            st.info("Uploaded File")
-            display_pdf(filepath)
+        # Check file size and compress if necessary
+        if os.path.getsize(filepath) > 10 * 1024 * 1024:  # 10MB
+            compressed_filepath = os.path.join(temp_dir, f"compressed_{uploaded_file.name}")
+            compress_result = compress_pdf(filepath, compressed_filepath)
+            if "Error" in compress_result:
+                st.error(compress_result)
+                filepath = None
+            else:
+                filepath = compressed_filepath
 
-        # Query and answer section on the right
-        with col2:
-            st.info("Enter your query(s) about the document:")
-            queries = st.text_area("Your Queries", placeholder="Enter each query separated by new lines...")
+        if filepath:
+            # Create two columns
+            col1, col2 = st.columns(2)
 
-            if st.button("Submit Queries"):
-                queries_list = queries.strip().split("\n")
-                answers = []
-                st.subheader("Summarized Answers")
+            # Display the PDF on the left
+            with col1:
+                st.info("Uploaded File")
+                display_pdf(filepath)
 
-                # Process each query one by one
-                for i, query in enumerate(queries_list, start=0):
-                    with st.spinner(f"Processing query {i}: {query}..."):
-                        summary = llm_pipeline(filepath, query)
-                        st.markdown(f"**{i}.** {summary}")
-                        answers.append(summary)
-                history.append(("PDF Summarization", queries_list, answers))
+            # Query and answer section on the right
+            with col2:
+                st.info("Enter your query(s) about the document:")
+                queries = st.text_area("Your Queries", placeholder="Enter each query separated by new lines...")
+
+                if st.button("Submit Queries"):
+                    queries_list = queries.strip().split("\n")
+                    answers = []
+                    st.subheader("Summarized Answers")
+
+                    # Process each query one by one
+                    for i, query in enumerate(queries_list, start=0):
+                        with st.spinner(f"Processing query {i}: {query}..."):
+                            summary = llm_pipeline(filepath, query)
+                            st.markdown(f"**{i}.** {summary}")
+                            answers.append(summary)
+                    history.append(("PDF Summarization", queries_list, answers))
 
 elif choice == "History":
     st.subheader("History")
