@@ -52,7 +52,8 @@ Deploying on Streamlit Cloud
 2.	Sign in to Streamlit Cloud.
 3.	Link your GitHub repository and deploy the app.py file.
 4.	Add the required secrets (OPENROUTER_API_KEY, WEATHER_API_KEY) under the app's Settings > Secrets.
-5.	Demo: https://custom-ai-123.streamlit.app/
+
+Demo: https://custom-ai-123.streamlit.app/
 ________________________________________
 GitHub Repository Structure
 📂 Repository_Name/
