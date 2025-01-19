@@ -1,4 +1,4 @@
-![Image](https://github.com/user-attachments/assets/83ce3945-9102-4c78-b87d-4ab35aec29e1)
+![Image](https://github.com/user-attachments/assets/5e683e2c-b3b0-4939-8895-b97f9b8c1061)
 # Multitool Chat Assistant 🌟
 
 The **Multitool Chat Assistant** is an all-in-one Streamlit-based application that leverages modern APIs and tools to provide various functionalities, such as PDF summarization, weather updates, query processing, image generation, and more. The application is designed for ease of use and versatility, catering to users with diverse needs.
