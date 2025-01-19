@@ -44,8 +44,8 @@ def display_pdf(file):
 def file_preprocessing(file):
     return extract_pdf_text(file)
 
-# Model options for summarization
-model_options = ["meta-llama/llama-3.2-11b-vision-instruct:free", "meta-llama/llama-3.1-70b-instruct:free", "huggingfaceh4/zephyr-7b-beta:free", "microsoft/phi-3-mini-128k-instruct:free", "mistralai/mistral-7b-instruct:free", "qwen/qwen-2-7b-instruct:free", "openchat/openchat-7b:free", "google/learnlm-1.5-pro-experimental:free"]
+# Model options for summarization and query processing
+model_options = ["meta-llama/llama-3.2-11b-vision-instruct:free", "meta-llama/llama-3.2-90b-vision-instruct:free" , "meta-llama/llama-3.1-70b-instruct:free", "huggingfaceh4/zephyr-7b-beta:free", "microsoft/phi-3-mini-128k-instruct:free", "mistralai/mistral-7b-instruct:free", "qwen/qwen-2-7b-instruct:free", "openchat/openchat-7b:free", "google/learnlm-1.5-pro-experimental:free", "google/gemini-2.0-flash-exp:free", "google/gemini-2.0-flash-thinking-exp:free"]
 selected_model = st.sidebar.selectbox("Choose a Model", model_options)
 
 # Function to summarize a document and answer queries
@@ -134,6 +134,11 @@ def search_duckduckgo(query, max_results=10):
             for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en"), start=1):
                 results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
         return results
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        else:
+            return [f"HTTP error occurred: {http_err}"]
     except Exception as e:
         return [f"An error occurred: {e}"]
 
@@ -200,11 +205,16 @@ def compress_pdf(input_pdf_path, output_pdf_path):
     except Exception as e:
         return f"Error compressing PDF: {e}"
 
+# Function to handle web search queries
+def handle_web_search(query):
+    results = search_duckduckgo(query)
+    return "\n".join(results)
+
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
 
 # Sidebar Menu
-menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "History"]
+menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "History"]
 choice = st.sidebar.selectbox("Choose a Feature", menu)
 
 history = st.session_state.get("history", [])
@@ -220,21 +230,14 @@ if choice == "Query Processing":
                 result = fetch_specified_location_weather(location)
             else:
                 result = fetch_current_location_weather()
-        elif '/' in user_query.lower():
-            results = search_duckduckgo(user_query)
-            result = "\n".join(results)
-        elif 'image' in user_query.lower():
-            url = f"https://www.meta.ai"
-            webbrowser.open(url)
-            result = "Opened image search."
         else:
             payload = {
-                "model": "mistralai/mistral-7b-instruct:free",
+                "model": selected_model,
                 "messages": [
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": user_query}
                 ],
-                "max_tokens": 100000
+                "max_tokens": 4000  # Add missing max_tokens value
             }
             headers = {
                 "Authorization": f"Bearer {API_KEY}"
@@ -242,7 +245,10 @@ if choice == "Query Processing":
             response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
             if response.status_code == 200:
                 result_data = response.json()
-                result = result_data['choices'][0]['message']['content']
+                if 'choices' in result_data:
+                    result = result_data['choices'][0]['message']['content']
+                else:
+                    result = "Error: 'choices' not found in the response."
             else:
                 result = f"Error in query processing: {response.text}"
 
@@ -357,6 +363,18 @@ elif choice == "PDF Summarization":
                             st.markdown(f"**{i}.** {summary}")
                             answers.append(summary)
                     history.append(("PDF Summarization", queries_list, answers))
+
+elif choice == "Web Search":
+    st.subheader("Web Search")
+    search_query = st.text_input("Enter your search query:")
+
+    if st.button("Search"):
+        result = handle_web_search(search_query)
+        if "Rate limit exceeded" in result:
+            st.error(result)
+        else:
+            st.write(result)
+        history.append(("Web Search", search_query, result))
 
 elif choice == "History":
     st.subheader("History")
