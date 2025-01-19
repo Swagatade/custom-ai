@@ -48,8 +48,8 @@ The **Multitool Chat Assistant** is an all-in-one Streamlit-based application th
 ### Steps
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/multitool-chat-assistant.git
-   cd multitool-chat-assistant
+[   git clone https://github.com/your-username/multitool-chat-assistant.git](https://github.com/Swagatade/custom-ai.git)
+   
 
 
 
