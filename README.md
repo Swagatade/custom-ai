@@ -56,11 +56,17 @@ Deploying on Streamlit Cloud
 Demo: https://custom-ai-123.streamlit.app/
 ________________________________________
 GitHub Repository Structure
+
 📂 Repository_Name/
-├── 📂 temp_data/                  # Temporary folder for storing files
-├── 📄 app.py                      # Main Streamlit app
-├── 📄 requirements.txt            # Python dependencies
-└── 📄 README.md                   # Documentation
+
+├── 📂 temp_data/                     # Temporary folder for storing files
+  
+├── 📄 app.py                         # Main Streamlit app
+                                  
+├── 📄 requirements.txt               # Python dependencies
+                                   
+└── 📄 README.md                      # Documentation
+                                   
 ________________________________________
 Adding GitHub Documentation
 Create a README.md
