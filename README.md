@@ -22,14 +22,23 @@ o	Provides a detailed explanation of the image content based on user queries.
 o	Tracks user activity within the app for reference.
 ________________________________________
 Technologies Used
+
 •	Python Libraries: 
+
 o	Streamlit for UI and interactivity.
+
 o	PyPDF2 for PDF processing.
+
 o	Pillow (PIL) for image handling.
+
 o	requests for API communication.
+
 o	duckduckgo_search for search engine results.
+
 •	APIs: 
+
 o	OpenRouter AI for language model queries.
+
 o	Tomorrow.io for weather data.
 ________________________________________
 Setup Instructions
