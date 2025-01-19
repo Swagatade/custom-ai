@@ -37,6 +37,7 @@ The **Multitool Chat Assistant** is an all-in-one Streamlit-based application th
 ### 6. **History**
 - Maintains a history of user interactions across all features.
 
+### [Demo](https://custom-ai-123.streamlit.app/)
 ---
 ![Image](https://github.com/user-attachments/assets/fb781453-cdcd-4a82-8385-8d326dd312a0)
 ## 🛠️ Installation
