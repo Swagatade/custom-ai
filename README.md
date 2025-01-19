@@ -1,24 +1,38 @@
 ![Image](https://github.com/user-attachments/assets/83ce3945-9102-4c78-b87d-4ab35aec29e1)
-# custom-ai
+# Multitool Chat Assistant
 Here is a comprehensive guide to uploading your Streamlit application, complete with documentation and steps to integrate it into GitHub for version control and collaboration:
 ________________________________________
 Streamlit Application Documentation
 Features
 1.	Query Processing
+
 o	Accepts natural language queries.
+
 o	Detects and processes weather queries, DuckDuckGo searches, and general queries using OpenRouter APIs.
+
 2.	Weather Information
+
 o	Fetches real-time weather details for the current or specified location using the Tomorrow.io Weather API.
+
 3.	PDF Summarization
+
 o	Uploads a PDF file for processing.
+
 o	Summarizes content and answers queries related to the document using OpenRouter APIs.
+
 4.	Image Search
+
 o	Generates images based on user-defined prompts.
+
 o	Offers an option to download generated images using Flux.
 5.	Picture Explanation
+
 o	Uploads an image.
+
 o	Provides a detailed explanation of the image content based on user queries.
+
 6.	History
+
 o	Tracks user activity within the app for reference.
 ________________________________________
 Technologies Used
@@ -49,11 +63,17 @@ Local Installation
 4.	Install dependencies:
 5.	pip install -r requirements.txt
 6.	Set environment variables:
+
 o	OPENROUTER_API_KEY: Your OpenRouter API key.
+
 o	WEATHER_API_KEY: Your Tomorrow.io API key.
+
 Example:
+
 export OPENROUTER_API_KEY=<your_openrouter_api_key>
+
 export WEATHER_API_KEY=<your_weather_api_key>
+
 7.	Run the Streamlit app:
 8.	streamlit run app.py
 Deploying on Streamlit Cloud
@@ -77,9 +97,6 @@ GitHub Repository Structure
 └── 📄 README.md                      # Documentation
                                    
 ________________________________________
-Adding GitHub Documentation
-Create a README.md
-# Multitool Chat Assistant
 
 A Streamlit application integrating LLMs, APIs, and other tools for text and image summarization, weather updates, and more.
 
