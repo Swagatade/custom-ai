@@ -11,7 +11,6 @@ The **Multitool Chat Assistant** is an all-in-one Streamlit-based application th
 - Submit queries for processing.
 - Integrated support for:
   - Weather inquiries (current and specific locations).
-  - DuckDuckGo search results.
   - Image searches.
   - General queries answered using AI models.
 
@@ -33,8 +32,11 @@ The **Multitool Chat Assistant** is an all-in-one Streamlit-based application th
 - Upload an image to:
   - Summarize its content.
   - Answer specific user-defined queries about the image.
+ 
+### 6. *Web search*
+ - DuckDuckGo search results.
 
-### 6. **History**
+### 7. **History**
 - Maintains a history of user interactions across all features.
 
 ### [Demo](https://custom-ai-123.streamlit.app/)
