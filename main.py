@@ -219,6 +219,12 @@ choice = st.sidebar.selectbox("Choose a Feature", menu)
 
 history = st.session_state.get("history", [])
 
+# Add a button to clear history
+if st.sidebar.button("Clear History"):
+    history = []
+    st.session_state["history"] = history
+    st.success("History cleared successfully.")
+
 if choice == "Query Processing":
     st.subheader("Query Processing")
     user_query = st.text_input("Enter your query:")
@@ -379,10 +385,20 @@ elif choice == "Web Search":
 elif choice == "History":
     st.subheader("History")
     if history:
+        # Add a button to clear all history
+        if st.button("Clear All History"):
+            history = []
+            st.session_state["history"] = history
+            st.success("All history cleared successfully.")
+        
         for idx, entry in enumerate(history, start=1):
             st.markdown(f"**{idx}. Feature:** {entry[0]}")
             st.markdown(f"**Input:** {entry[1]}")
             st.markdown(f"**Output:** {entry[2]}")
+            if st.button(f"Delete Entry {idx}", key=f"delete_{idx}"):
+                history.pop(idx-1)
+                st.session_state["history"] = history
+                st.rerun()
     else:
         st.write("No history available.")
 
