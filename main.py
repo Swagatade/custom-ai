@@ -398,7 +398,7 @@ elif choice == "History":
             if st.button(f"Delete Entry {idx}", key=f"delete_{idx}"):
                 history.pop(idx-1)
                 st.session_state["history"] = history
-                st.rerun()
+                st.experimental_rerun()
     else:
         st.write("No history available.")
 
