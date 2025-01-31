@@ -69,12 +69,12 @@ def llm_pipeline(filepath, query):
     input_text = file_preprocessing(filepath)
 
     payload = {
-        "model": selected_model,
+        "model": selected_model,  # Use the globally selected model
         "messages": [
             {"role": "system", "content": "You are an assistant summarizing a document."},
             {"role": "user", "content": f"Summarize the following text:\n{input_text}\nBased on the document, answer the question: {query}"}
         ],
-        "max_tokens":10000
+        "max_tokens": 10000
     }
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -82,7 +82,10 @@ def llm_pipeline(filepath, query):
     response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
     if response.status_code == 200:
         result = response.json()
-        return result['choices'][0]['message']['content']
+        if 'choices' in result:
+            return result['choices'][0]['message']['content']
+        else:
+            return "Error: 'choices' not found in the response."
     else:
         return f"Error during summarization: {response.json().get('message', 'Unknown error')}"
 
@@ -180,7 +183,7 @@ def summarize_image(image_path, query):
                 encoded_image = base64.b64encode(output.getvalue()).decode("utf-8")
         
         payload = {
-            "model": selected_model,
+            "model": selected_model,  # Use the globally selected model
             "messages": [
                 {"role": "system", "content": "You are an assistant providing a detailed description of an image."},
                 {"role": "user", "content": f"Describe the image in detail based on the following query: {query}\n{encoded_image}"}
@@ -254,7 +257,7 @@ if choice == "Query Processing":
                 result = fetch_current_location_weather()
         else:
             payload = {
-                "model": selected_model,
+                "model": selected_model,  # Use the globally selected model
                 "messages": [
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": user_query}
