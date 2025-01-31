@@ -54,7 +54,7 @@ model_options = [
     "google/gemini-2.0-flash-exp:free",
     "google/gemini-2.0-flash-thinking-exp:free",
     "google/learnlm-1.5-pro-experimental:free",
-    "deepseek/deepseek-r1:free"
+    "deepseek/deepseek-r1:free",
     "mistralai/mistral-7b-instruct:free",
     "microsoft/phi-3-mini-128k-instruct:free",
     "microsoft/phi-3-medium-128k-instruct:free",
