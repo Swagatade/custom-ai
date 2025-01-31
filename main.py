@@ -51,6 +51,7 @@ model_options = [
     "meta-llama/llama-3.1-70b-instruct:free",
     "meta-llama/llama-3.1-405b-instruct:free",
     "google/gemma-2-9b-it:free",
+    "google/gemini-2.0-flash-thinking-exp-1219:free",
     "google/gemini-2.0-flash-exp:free",
     "google/gemini-2.0-flash-thinking-exp:free",
     "google/learnlm-1.5-pro-experimental:free",
