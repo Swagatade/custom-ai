@@ -45,7 +45,22 @@ def file_preprocessing(file):
     return extract_pdf_text(file)
 
 # Model options for summarization and query processing
-model_options = ["meta-llama/llama-3.2-11b-vision-instruct:free", "meta-llama/llama-3.2-90b-vision-instruct:free", "meta-llama/llama-3.1-70b-instruct:free", "meta-llama/llama-3.1-405b-instruct:free", "google/gemma-2-9b-it:free", "google/gemini-2.0-flash-exp:free", "google/gemini-2.0-flash-thinking-exp:free", "google/gemini-2.0-flash-thinking-exp:free", "google/learnlm-1.5-pro-experimental:free", "deepseek/deepseek-r1:free", "mistralai/mistral-7b-instruct:free", "microsoft/phi-3-mini-128k-instruct:free", "microsoft/phi-3-medium-128k-instruct:free", "qwen/qwen-2-7b-instruct:free", "huggingfaceh4/zephyr-7b-beta:free", "openchat/openchat-7b:free"]
+model_options = [
+    "meta-llama/llama-3.2-11b-vision-instruct:free",
+    "meta-llama/llama-3.2-90b-vision-instruct:free",
+    "meta-llama/llama-3.1-70b-instruct:free",
+    "meta-llama/llama-3.1-405b-instruct:free",
+    "google/gemma-2-9b-it:free",
+    "google/gemini-2.0-flash-exp:free",
+    "google/gemini-2.0-flash-thinking-exp:free",
+    "google/learnlm-1.5-pro-experimental:free",
+    "mistralai/mistral-7b-instruct:free",
+    "microsoft/phi-3-mini-128k-instruct:free",
+    "microsoft/phi-3-medium-128k-instruct:free",
+    "qwen/qwen-2-7b-instruct:free",
+    "huggingfaceh4/zephyr-7b-beta:free",
+    "openchat/openchat-7b:free"
+]
 selected_model = st.sidebar.selectbox("Choose a Model", model_options)
 
 # Function to summarize a document and answer queries
