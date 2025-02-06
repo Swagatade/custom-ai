@@ -7,6 +7,26 @@ import webbrowser
 import PyPDF2
 from PIL import Image
 import io
+import sqlite3
+
+# Database setup
+conn = sqlite3.connect('history.db')
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS history
+             (id INTEGER PRIMARY KEY, feature TEXT, input TEXT, output TEXT)''')
+conn.commit()
+
+def save_history_to_db(feature, input_data, output_data):
+    c.execute("INSERT INTO history (feature, input, output) VALUES (?, ?, ?)", (feature, input_data, output_data))
+    conn.commit()
+
+def load_history_from_db():
+    c.execute("SELECT feature, input, output FROM history")
+    return c.fetchall()
+
+def clear_history_from_db():
+    c.execute("DELETE FROM history")
+    conn.commit()
 
 # API Configuration
 API_BASE_URL = "https://openrouter.ai/api/v1"
@@ -262,12 +282,13 @@ st.title("Multitool Chat Assistant")
 menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "History"]
 choice = st.sidebar.selectbox("Choose a Feature", menu)
 
-history = st.session_state.get("history", [])
+history = st.session_state.get("history", load_history_from_db())
 
 # Add a button to clear history
 if st.sidebar.button("Clear History"):
     history = []
     st.session_state["history"] = history
+    clear_history_from_db()
     st.success("History cleared successfully.")
 
 if choice == "Query Processing":
@@ -305,6 +326,7 @@ if choice == "Query Processing":
 
         st.write(result)
         history.append(("Query Processing", user_query, result))
+        save_history_to_db("Query Processing", user_query, result)
 
 elif choice == "Weather Information":
     st.subheader("Weather Information")
@@ -318,6 +340,7 @@ elif choice == "Weather Information":
 
         st.write(result)
         history.append(("Weather Information", location or "Current Location", result))
+        save_history_to_db("Weather Information", location or "Current Location", result)
 
 elif choice == "Image Search":
     st.subheader("Image Search")
@@ -338,6 +361,7 @@ elif choice == "Image Search":
                 mime="image/jpeg"
             )
         history.append(("Image Search", prompt, image_path))
+        save_history_to_db("Image Search", prompt, image_path)
 
 elif choice == "Picture Explanation":
     st.subheader("Picture Explanation")
@@ -365,6 +389,7 @@ elif choice == "Picture Explanation":
                 else:
                     st.write(summary)
                 history.append(("Picture Explanation", uploaded_image.name, summary))
+                save_history_to_db("Picture Explanation", uploaded_image.name, summary)
 
 elif choice == "PDF Summarization":
     st.subheader("PDF Summarization")
@@ -414,6 +439,7 @@ elif choice == "PDF Summarization":
                             st.markdown(f"**{i}.** {summary}")
                             answers.append(summary)
                     history.append(("PDF Summarization", queries_list, answers))
+                    save_history_to_db("PDF Summarization", queries_list, answers)
 
 elif choice == "Web Search":
     st.subheader("Web Search")
@@ -428,6 +454,7 @@ elif choice == "Web Search":
             st.write(result)
         if not incognito_mode:
             history.append(("Web Search", search_query, result))
+            save_history_to_db("Web Search", search_query, result)
 
 elif choice == "History":
     st.subheader("History")
@@ -436,6 +463,7 @@ elif choice == "History":
         if st.button("Clear All History"):
             history = []
             st.session_state["history"] = history
+            clear_history_from_db()
             st.success("All history cleared successfully.")
         
         for idx, entry in enumerate(history, start=1):
@@ -445,6 +473,8 @@ elif choice == "History":
             if st.button(f"Delete Entry {idx}", key=f"delete_{idx}"):
                 history.pop(idx-1)
                 st.session_state["history"] = history
+                c.execute("DELETE FROM history WHERE id = ?", (idx,))
+                conn.commit()
                 st.experimental_rerun()
     else:
         st.write("No history available.")
