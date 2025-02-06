@@ -168,6 +168,22 @@ def search_duckduckgo(query, max_results=10):
     except Exception as e:
         return [f"An error occurred: {e}"]
 
+# Function to perform DuckDuckGo search in incognito mode
+def search_duckduckgo_incognito(query, max_results=10):
+    try:
+        results = []
+        with DDGS() as ddgs:
+            for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+        return results
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        else:
+            return [f"HTTP error occurred: {http_err}"]
+    except Exception as e:
+        return [f"An error occurred: {e}"]
+
 # Function to download and display image
 def download_image(prompt, width=768, height=768, model='flux', seed=None):
     url = f"https://image.pollinations.ai/prompt/{prompt}?width={width}&height={height}&model={model}&seed={seed}"
@@ -232,8 +248,11 @@ def compress_pdf(input_pdf_path, output_pdf_path):
         return f"Error compressing PDF: {e}"
 
 # Function to handle web search queries
-def handle_web_search(query):
-    results = search_duckduckgo(query)
+def handle_web_search(query, incognito=False):
+    if incognito:
+        results = search_duckduckgo_incognito(query)
+    else:
+        results = search_duckduckgo(query)
     return "\n".join(results)
 
 # Main Streamlit App
@@ -399,14 +418,16 @@ elif choice == "PDF Summarization":
 elif choice == "Web Search":
     st.subheader("Web Search")
     search_query = st.text_input("Enter your search query:")
+    incognito_mode = st.checkbox("Incognito Mode")
 
     if st.button("Search"):
-        result = handle_web_search(search_query)
+        result = handle_web_search(search_query, incognito_mode)
         if "Rate limit exceeded" in result:
             st.error(result)
         else:
             st.write(result)
-        history.append(("Web Search", search_query, result))
+        if not incognito_mode:
+            history.append(("Web Search", search_query, result))
 
 elif choice == "History":
     st.subheader("History")
@@ -429,3 +450,7 @@ elif choice == "History":
         st.write("No history available.")
 
 st.session_state["history"] = history
+
+# Add footer
+st.markdown("---")
+st.markdown("App created by Swagata Dey")
