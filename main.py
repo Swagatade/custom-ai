@@ -3,7 +3,6 @@ import requests
 import base64
 import os
 from duckduckgo_search import DDGS
-import webbrowser
 import PyPDF2
 from PIL import Image
 import io
