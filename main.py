@@ -66,6 +66,7 @@ def file_preprocessing(file):
 
 # Model options for summarization and query processing
 model_options = [
+    "meta-llama/llama-3.3-70b-instruct:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
     "meta-llama/llama-3.2-90b-vision-instruct:free",
     "meta-llama/llama-3.1-70b-instruct:free",
@@ -75,8 +76,8 @@ model_options = [
     "google/gemini-2.0-flash-thinking-exp-1219:free",
     "google/gemini-2.0-flash-exp:free",
     "google/gemini-2.0-flash-thinking-exp:free",
-    "google/learnlm-1.5-pro-experimental:free",
     "google/gemini-2.0-flash-lite-preview-02-05:free",
+    "google/learnlm-1.5-pro-experimental:free",
     "google/learnlm-1.5-pro-experimental:free",
     "deepseek/deepseek-r1:free",
     "deepseek/deepseek-r1-distill-llama-70b:free",
