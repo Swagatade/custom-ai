@@ -86,6 +86,7 @@ model_options = [
     "google/learnlm-1.5-pro-experimental:free",
     "deepseek/deepseek-r1:free",
     "deepseek/deepseek-r1-distill-llama-70b:free",
+    "deepseek/deepseek-chat:free",
     "mistralai/mistral-7b-instruct:free",
     "microsoft/phi-3-mini-128k-instruct:free",
     "microsoft/phi-3-medium-128k-instruct:free",
