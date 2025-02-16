@@ -308,6 +308,50 @@ def handle_web_search(query, incognito=False):
         results = search_duckduckgo(query)
     return "\n".join(results)
 
+# Function to fetch weather for the device's current location
+def fetch_device_location_weather(latitude, longitude):
+    try:
+        weather_url = f"https://api.tomorrow.io/v4/weather/realtime?location={latitude},{longitude}&apikey={WEATHER_API_KEY}"
+        headers = {"accept": "application/json"}
+        weather_response = requests.get(weather_url, headers=headers)
+
+        if weather_response.status_code == 200:
+            weather_data = weather_response.json()["data"]["values"]
+            return st.markdown(format_weather_display(weather_data), unsafe_allow_html=True)
+        else:
+            return st.error(f"Failed to fetch weather data. Status Code: {weather_response.status_code}")
+    except Exception as e:
+        return st.error(f"An error occurred: {e}")
+
+# Add JavaScript to get device location
+st.markdown("""
+<script>
+navigator.geolocation.getCurrentPosition(
+    function(position) {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        document.getElementById('latitude').value = latitude;
+        document.getElementById('longitude').value = longitude;
+        document.getElementById('location-form').submit();
+    },
+    function(error) {
+        console.error("Error getting location: ", error);
+    }
+);
+</script>
+<form id="location-form" method="post">
+    <input type="hidden" id="latitude" name="latitude">
+    <input type="hidden" id="longitude" name="longitude">
+</form>
+""", unsafe_allow_html=True)
+
+# Handle form submission to get weather data
+query_params = st.query_params
+if query_params.get("latitude") and query_params.get("longitude"):
+    latitude = query_params.get("latitude")[0]
+    longitude = query_params.get("longitude")[0]
+    fetch_device_location_weather(latitude, longitude)
+
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
 
