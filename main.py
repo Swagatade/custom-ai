@@ -134,18 +134,26 @@ def fetch_current_location_weather():
         geo_response = requests.get(geo_url)
         geo_data = geo_response.json()
         latitude, longitude = geo_data['loc'].split(',')
-
         weather_url = f"https://api.tomorrow.io/v4/weather/realtime?location={latitude},{longitude}&apikey={WEATHER_API_KEY}"
         headers = {"accept": "application/json"}
         weather_response = requests.get(weather_url, headers=headers)
 
         if weather_response.status_code == 200:
             weather_data = weather_response.json()["data"]["values"]
-            return st.markdown(format_weather_display(weather_data), unsafe_allow_html=True)
+            return (
+                f"**Current Location Weather:**\n"
+                f"- Temperature: {weather_data['temperature']}\u00b0C\n"
+                f"- Apparent Temperature: {weather_data['temperatureApparent']}\u00b0C\n"
+                f"- Humidity: {weather_data['humidity']}%\n"
+                f"- Wind Speed: {weather_data['windSpeed']} m/s\n"
+                f"- Cloud Cover: {weather_data['cloudCover']}%\n"
+                f"- Visibility: {weather_data['visibility']} km\n"
+                f"- UV Index: {weather_data['uvIndex']}"
+            )
         else:
-            return st.error(f"Failed to fetch weather data. Status Code: {weather_response.status_code}")
+            return f"Failed to fetch weather data. Status Code: {weather_response.status_code}, Message: {weather_response.text}"
     except Exception as e:
-        return st.error(f"An error occurred: {e}")
+        return f"An error occurred: {e}"
 
 # Function to fetch weather for a specified location
 def fetch_specified_location_weather(location):
