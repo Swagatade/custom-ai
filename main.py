@@ -8,6 +8,7 @@ from PIL import Image
 import io
 import sqlite3
 import urllib.parse  # Added for URL parsing
+import streamlit_js_eval as st_js
 
 # Database setup
 conn = sqlite3.connect('history.db')
@@ -130,13 +131,12 @@ def llm_pipeline(filepath, query):
 # Function to fetch current location weather
 def fetch_current_location_weather():
     try:
-        geo_url = "https://ipinfo.io/json"
-        geo_response = requests.get(geo_url)
-        geo_data = geo_response.json()
-        latitude, longitude = geo_data['loc'].split(',')
-        # Retrieve current location name (fallback to "Current Location" if not provided)
-        location_name = geo_data.get('city', 'Current Location')
-        
+        # Get device location using browser geolocation
+        location = get_browser_location()
+        if location is None:
+            return st.error("Unable to get device location. Please allow location access.")
+        latitude, longitude = location.get("latitude"), location.get("longitude")
+        location_name = "Current Location"
         weather_url = f"https://api.tomorrow.io/v4/weather/realtime?location={latitude},{longitude}&apikey={WEATHER_API_KEY}"
         headers = {"accept": "application/json"}
         weather_response = requests.get(weather_url, headers=headers)
@@ -324,6 +324,15 @@ def fetch_device_location_weather(latitude, longitude):
             return st.error(f"Failed to fetch weather data. Status Code: {weather_response.status_code}")
     except Exception as e:
         return st.error(f"An error occurred: {e}")
+
+# Added new function definition for browser geolocation
+def get_browser_location():
+    # Returns a dict with latitude and longitude keys if permission granted, else None.
+    try:
+        location = st_js.get_geolocation()  # requires proper browser permission
+        return location  # e.g., {"latitude": 12.34, "longitude": 56.78}
+    except Exception as e:
+        return None
 
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
@@ -1006,7 +1015,7 @@ elif choice == "📄 PDF Summarization":
     if uploaded_file is not None:
         # Save uploaded file temporarily
         temp_dir = "temp_data"
-        os.makedirs(temp_dir, exist_ok=True)
+        os.makedirs(temp_dir, exist_okay=True)
         filepath = os.path.join(temp_dir, uploaded_file.name)
         with open(filepath, "wb") as temp_file:
             temp_file.write(uploaded_file.read())
