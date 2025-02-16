@@ -323,34 +323,38 @@ def fetch_device_location_weather(latitude, longitude):
     except Exception as e:
         return st.error(f"An error occurred: {e}")
 
-# Add JavaScript to get device location
+# Add JavaScript to get device location and pass it to Streamlit
 st.markdown("""
 <script>
-navigator.geolocation.getCurrentPosition(
-    function(position) {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-        document.getElementById('latitude').value = latitude;
-        document.getElementById('longitude').value = longitude;
-        document.getElementById('location-form').submit();
-    },
-    function(error) {
-        console.error("Error getting location: ", error);
-    }
-);
+function getLocation() {
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            document.getElementById('latitude').value = latitude;
+            document.getElementById('longitude').value = longitude;
+            document.getElementById('location-form').submit();
+        },
+        function(error) {
+            console.error("Error getting location: ", error);
+        }
+    );
+}
+window.onload = getLocation;
 </script>
 <form id="location-form" method="post">
     <input type="hidden" id="latitude" name="latitude">
     <input type="hidden" id="longitude" name="longitude">
+    <input type="hidden" name="location_submitted" value="true">
 </form>
 """, unsafe_allow_html=True)
 
 # Handle form submission to get weather data
-query_params = st.experimental_get_query_params()
-if query_params.get("latitude") and query_params.get("longitude"):
-    latitude = query_params.get("latitude")[0]
-    longitude = query_params.get("longitude")[0]
-    fetch_device_location_weather(latitude, longitude)
+if st.session_state.get("location_submitted"):
+    latitude = st.session_state.get("latitude")
+    longitude = st.session_state.get("longitude")
+    if latitude and longitude:
+        fetch_device_location_weather(latitude, longitude)
 
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
