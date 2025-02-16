@@ -346,7 +346,7 @@ navigator.geolocation.getCurrentPosition(
 """, unsafe_allow_html=True)
 
 # Handle form submission to get weather data
-query_params = st.query_params
+query_params = st.experimental_get_query_params()
 if query_params.get("latitude") and query_params.get("longitude"):
     latitude = query_params.get("latitude")[0]
     longitude = query_params.get("longitude")[0]
