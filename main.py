@@ -8,7 +8,6 @@ from PIL import Image
 import io
 import sqlite3
 import urllib.parse  # Added for URL parsing
-import streamlit_js_eval as st_js
 
 # Database setup
 conn = sqlite3.connect('history.db')
@@ -131,19 +130,18 @@ def llm_pipeline(filepath, query):
 # Function to fetch current location weather
 def fetch_current_location_weather():
     try:
-        # Get device location using browser geolocation
-        location = get_browser_location()
-        if location is None:
-            return st.error("Unable to get device location. Please allow location access.")
-        latitude, longitude = location.get("latitude"), location.get("longitude")
-        location_name = "Current Location"
+        geo_url = "https://ipinfo.io/json"
+        geo_response = requests.get(geo_url)
+        geo_data = geo_response.json()
+        latitude, longitude = geo_data['loc'].split(',')
+
         weather_url = f"https://api.tomorrow.io/v4/weather/realtime?location={latitude},{longitude}&apikey={WEATHER_API_KEY}"
         headers = {"accept": "application/json"}
         weather_response = requests.get(weather_url, headers=headers)
 
         if weather_response.status_code == 200:
             weather_data = weather_response.json()["data"]["values"]
-            return st.markdown(format_weather_display(weather_data, location=location_name), unsafe_allow_html=True)
+            return st.markdown(format_weather_display(weather_data), unsafe_allow_html=True)
         else:
             return st.error(f"Failed to fetch weather data. Status Code: {weather_response.status_code}")
     except Exception as e:
@@ -325,14 +323,34 @@ def fetch_device_location_weather(latitude, longitude):
     except Exception as e:
         return st.error(f"An error occurred: {e}")
 
-# Added new function definition for browser geolocation
-def get_browser_location():
-    # Returns a dict with latitude and longitude keys if permission granted, else None.
-    try:
-        location = st_js.get_geolocation()  # requires proper browser permission
-        return location  # e.g., {"latitude": 12.34, "longitude": 56.78}
-    except Exception as e:
-        return None
+# Add JavaScript to get device location
+st.markdown("""
+<script>
+navigator.geolocation.getCurrentPosition(
+    function(position) {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        document.getElementById('latitude').value = latitude;
+        document.getElementById('longitude').value = longitude;
+        document.getElementById('location-form').submit();
+    },
+    function(error) {
+        console.error("Error getting location: ", error);
+    }
+);
+</script>
+<form id="location-form" method="post">
+    <input type="hidden" id="latitude" name="latitude">
+    <input type="hidden" id="longitude" name="longitude">
+</form>
+""", unsafe_allow_html=True)
+
+# Handle form submission to get weather data
+query_params = st.experimental_get_query_params()
+if query_params.get("latitude") and query_params.get("longitude"):
+    latitude = query_params.get("latitude")[0]
+    longitude = query_params.get("longitude")[0]
+    fetch_device_location_weather(latitude, longitude)
 
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
@@ -1015,7 +1033,7 @@ elif choice == "📄 PDF Summarization":
     if uploaded_file is not None:
         # Save uploaded file temporarily
         temp_dir = "temp_data"
-        os.makedirs(temp_dir, exist_okay=True)
+        os.makedirs(temp_dir, exist_ok=True)
         filepath = os.path.join(temp_dir, uploaded_file.name)
         with open(filepath, "wb") as temp_file:
             temp_file.write(uploaded_file.read())
