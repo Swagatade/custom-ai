@@ -323,33 +323,6 @@ def fetch_device_location_weather(latitude, longitude):
     except Exception as e:
         return st.error(f"An error occurred: {e}")
 
-# Replace the old JS and hidden form with this updated JS that redirects with query params
-st.markdown("""
-<script>
-function getLocation() {
-    navigator.geolocation.getCurrentPosition(
-        function(position) {
-            const latitude = position.coords.latitude;
-            const longitude = position.coords.longitude;
-            // Redirect with latitude and longitude as query parameters
-            window.location.search = `?latitude=${latitude}&longitude=${longitude}`;
-        },
-        function(error) {
-            console.error("Error getting location: ", error);
-        }
-    );
-}
-window.onload = getLocation;
-</script>
-""", unsafe_allow_html=True)
-
-# Use query parameters to fetch device location weather data
-params = st.experimental_get_query_params()
-if "latitude" in params and "longitude" in params:
-    latitude = params["latitude"][0]
-    longitude = params["longitude"][0]
-    fetch_device_location_weather(latitude, longitude)
-
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
 
