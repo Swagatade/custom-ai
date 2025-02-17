@@ -11,6 +11,14 @@ import urllib.parse  # Added for URL parsing
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 import isodate
+import duckduckgo_search.duckduckgo_search as dds
+
+# Patch to remove the unsupported 'proxies' argument from DDGS.__init__
+_original_init = dds.DDGS.__init__
+def _patched_init(self, *args, **kwargs):
+    kwargs.pop('proxies', None)
+    return _original_init(self, *args, **kwargs)
+dds.DDGS.__init__ = _patched_init
 
 # Database setup
 conn = sqlite3.connect('history.db')
