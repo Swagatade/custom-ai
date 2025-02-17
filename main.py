@@ -11,9 +11,6 @@ import urllib.parse  # Added for URL parsing
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 import isodate
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from langchain.llms import OpenAI
 
 # Database setup
 conn = sqlite3.connect('history.db')
@@ -894,13 +891,12 @@ feature_icons = {
     "Picture Explanation": "🖼️",
     "Web Search": "🔍",
     "History": "📚",
-    "1 Click": "🎯",
-    "Real-time Info Search": "🕵️"
+    "1 Click": "🎯"
 }
 
 # Update menu with icons
 menu = [f"{feature_icons[item]} {item}" for item in ["1 Click", "Query Processing", "Weather Information", "PDF Summarization", 
-                                                    "Image Search", "Picture Explanation", "Web Search", "History", "Real-time Info Search"]]
+                                                    "Image Search", "Picture Explanation", "Web Search", "History"]]
 
 # Sidebar Menu
 choice = st.sidebar.selectbox("Choose a Feature", menu)
@@ -944,20 +940,6 @@ def get_youtube_videos(query, max_results=5):
         return videos
     except Exception as e:
         return []
-
-# New global LangChain prompt template
-search_prompt_template = PromptTemplate.from_template(
-    "Find information about {topic}. Provide a summary of the top results."
-)
-
-def duckduckgo_search_chain(query):
-    # Build the prompt and LLM chain
-    prompt = search_prompt_template.format(topic=query)
-    print(prompt)  # For demonstration purposes
-    llm = OpenAI(api_key=API_KEY, model_name="gpt-3.5-turbo")
-    chain = LLMChain(llm=llm, prompt=search_prompt_template)
-    summary = chain.run(topic=query)
-    return summary
 
 # Modify feature sections to add animations
 if choice == "🎯 1 Click":
@@ -1275,14 +1257,6 @@ elif choice == "📚 History":
                 st.experimental_rerun()
     else:
         st.write("No history available.")
-
-elif choice == "🕵️ Real-time Info Search":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-    st.subheader("🕵️ Real-time Info Search")
-    realtime_query = st.text_input("Enter a topic to search:")
-    if st.button("Search"):
-        summary = duckduckgo_search_chain(realtime_query)
-        st.write(summary)
 
 st.session_state["history"] = history
 
