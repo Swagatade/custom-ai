@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import os
-from duckduckgo_search import ddg  # Corrected import statement
+from duckduckgo_search import DDGS
 import PyPDF2
 from PIL import Image
 import io
@@ -173,10 +173,10 @@ import time
 def search_duckduckgo(query, max_results=10):
     try:
         results = []
-        search_results = ddg(query, region="in-en", safesearch="Moderate", max_results=max_results)
-        for idx, result in enumerate(search_results, start=1):
-            results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-            time.sleep(1)  # Add delay to avoid rate limit
+        with DDGS() as ddgs:
+            for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+                time.sleep(1)  # Add delay to avoid rate limit
         return results
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 429:
@@ -192,9 +192,9 @@ def search_duckduckgo(query, max_results=10):
 def search_duckduckgo_incognito(query, max_results=10):
     try:
         results = []
-        search_results = ddg(query, region="in-en", safesearch="Off", max_results=max_results)
-        for idx, result in enumerate(search_results, start=1):
-            results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+        with DDGS() as ddgs:
+            for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
         return results
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 429:
@@ -933,8 +933,7 @@ def get_youtube_videos(query, max_results=5):
             part='snippet',
             q=query,
             type='video',
-            maxResults=max_results,
-            regionCode='IN'  # Limit results to India
+            maxResults=max_results
         )
         response = request.execute()
         
@@ -1055,7 +1054,7 @@ if choice == "🎯 1 Click":
                     result = response.json()
                     if 'choices' in result and len(result['choices']) > 0:
                         analysis = result['choices'][0]['message']['content']
-                        st.markdown(f'<div class="ai-analysis">{repr(analysis)}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="ai-analysis">{analysis}</div>', unsafe_allow_html=True)
                     else:
                         st.error("No analysis generated from the AI model.")
                 else:
