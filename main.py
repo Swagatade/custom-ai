@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import os
-from duckduckgo_search import ddg  # Corrected import statement
+from duckduckgo_search import DDGS
 import PyPDF2
 from PIL import Image
 import io
@@ -173,10 +173,10 @@ import time
 def search_duckduckgo(query, max_results=10):
     try:
         results = []
-        search_results = ddg(query, region="in-en", safesearch="Moderate", max_results=max_results)
-        for idx, result in enumerate(search_results, start=1):
-            results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-            time.sleep(1)  # Add delay to avoid rate limit
+        with DDGS() as macs:
+            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+                time.sleep(1)  # Add delay to avoid rate limit
         return results
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 429:
@@ -192,9 +192,9 @@ def search_duckduckgo(query, max_results=10):
 def search_duckduckgo_incognito(query, max_results=10):
     try:
         results = []
-        search_results = ddg(query, region="in-en", safesearch="Off", max_results=max_results)
-        for idx, result in enumerate(search_results, start=1):
-            results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+        with DDGS() as macs:
+            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
         return results
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 429:
@@ -1233,16 +1233,34 @@ elif choice == "🔍 Web Search":
     incognito_mode = st.checkbox("Incognito Mode")
 
     if st.button("Search"):
-        # Fetch search results based on incognito mode flag
         if incognito_mode:
             results = search_duckduckgo_incognito(search_query)
         else:
             results = search_duckduckgo(search_query)
-        # Display results if they exist
-        if isinstance(results, list) and results:
-            st.markdown("\n".join(results))
+
+        if isinstance(results, list):
+            st.markdown("### Search Results")
+            logo_mapping = {
+                "duckduckgo.com": "https://duckduckgo.com/assets/logo_homepage.normal.v108.svg",
+                "google.com": "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
+                "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
+            }
+            for res in results:
+                parts = res.splitlines()
+                url_line = next((line for line in parts if line.startswith("URL:")), "")
+                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
+                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
+                # Use a lightweight favicon service with smaller size (sz=16)
+                logo = logo_mapping.get(domain) or f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
+                st.markdown(f'<img src="{logo}" width="16" style="vertical-align: middle;">', unsafe_allow_html=True)
+                st.markdown(f"**{domain}**")
+                st.markdown(res)
         else:
-            st.error("No results found.")
+            st.error(results)
+
+        if not incognito_mode:
+            history.append(("Web Search", search_query, results))
+            save_history_to_db("Web Search", search_query, results)
 
 elif choice == "📚 History":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
