@@ -933,7 +933,8 @@ def get_youtube_videos(query, max_results=5):
             part='snippet',
             q=query,
             type='video',
-            maxResults=max_results
+            maxResults=max_results,
+            regionCode='IN'  # Limit results to India
         )
         response = request.execute()
         
@@ -1054,7 +1055,7 @@ if choice == "🎯 1 Click":
                     result = response.json()
                     if 'choices' in result and len(result['choices']) > 0:
                         analysis = result['choices'][0]['message']['content']
-                        st.markdown(f'<div class="ai-analysis">{analysis}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="ai-analysis">{repr(analysis)}</div>', unsafe_allow_html=True)
                     else:
                         st.error("No analysis generated from the AI model.")
                 else:
