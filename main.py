@@ -1233,34 +1233,16 @@ elif choice == "🔍 Web Search":
     incognito_mode = st.checkbox("Incognito Mode")
 
     if st.button("Search"):
+        # Fetch search results based on incognito mode flag
         if incognito_mode:
             results = search_duckduckgo_incognito(search_query)
         else:
             results = search_duckduckgo(search_query)
-
-        if isinstance(results, list):
-            st.markdown("### Search Results")
-            logo_mapping = {
-                "duckduckgo.com": "https://duckduckgo.com/assets/logo_homepage.normal.v108.svg",
-                "google.com": "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
-                "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
-            }
-            for res in results:
-                parts = res.splitlines()
-                url_line = next((line for line in parts if line.startswith("URL:")), "")
-                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
-                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
-                # Use a lightweight favicon service with smaller size (sz=16)
-                logo = logo_mapping.get(domain) or f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
-                st.markdown(f'<img src="{logo}" width="16" style="vertical-align: middle;">', unsafe_allow_html=True)
-                st.markdown(f"**{domain}**")
-                st.markdown(res)
+        # Display results if they exist
+        if isinstance(results, list) and results:
+            st.markdown("\n".join(results))
         else:
-            st.error(results)
-
-        if not incognito_mode:
-            history.append(("Web Search", search_query, results))
-            save_history_to_db("Web Search", search_query, results)
+            st.error("No results found.")
 
 elif choice == "📚 History":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
