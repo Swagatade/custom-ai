@@ -8,6 +8,9 @@ from PIL import Image
 import io
 import sqlite3
 import urllib.parse  # Added for URL parsing
+from googleapiclient.discovery import build
+from youtube_transcript_api import YouTubeTranscriptApi
+import isodate
 
 # Database setup
 conn = sqlite3.connect('history.db')
@@ -165,15 +168,20 @@ def fetch_specified_location_weather(location):
         return st.error(f"An error occurred: {e}")
 
 # Function to perform DuckDuckGo search
+import time
+
 def search_duckduckgo(query, max_results=10):
     try:
         results = []
         with DDGS() as ddgs:
             for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en"), start=1):
                 results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+                time.sleep(1)  # Add delay to avoid rate limit
         return results
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        elif http_err.response.status_code == 202:
             return [f"Rate limit exceeded. Please try again later."]
         else:
             return [f"HTTP error occurred: {http_err}"]
@@ -346,7 +354,7 @@ navigator.geolocation.getCurrentPosition(
 """, unsafe_allow_html=True)
 
 # Handle form submission to get weather data
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 if query_params.get("latitude") and query_params.get("longitude"):
     latitude = query_params.get("latitude")[0]
     longitude = query_params.get("longitude")[0]
@@ -895,11 +903,12 @@ feature_icons = {
     "Image Search": "🎨",
     "Picture Explanation": "🖼️",
     "Web Search": "🔍",
-    "History": "📚"
+    "History": "📚",
+    "1 Click": "🎯"
 }
 
 # Update menu with icons
-menu = [f"{feature_icons[item]} {item}" for item in ["Query Processing", "Weather Information", "PDF Summarization", 
+menu = [f"{feature_icons[item]} {item}" for item in ["1 Click", "Query Processing", "Weather Information", "PDF Summarization", 
                                                     "Image Search", "Picture Explanation", "Web Search", "History"]]
 
 # Sidebar Menu
@@ -914,8 +923,149 @@ if st.sidebar.button("Clear History"):
     clear_history_from_db()
     st.success("History cleared successfully.")
 
+# Add this function before the main Streamlit app section
+def get_youtube_videos(query, max_results=5):
+    try:
+        youtube = build('youtube', 'v3', 
+                       developerKey='AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk')
+        
+        request = youtube.search().list(
+            part='snippet',
+            q=query,
+            type='video',
+            maxResults=max_results
+        )
+        response = request.execute()
+        
+        videos = []
+        for item in response['items']:
+            video_id = item['id']['videoId']
+            title = item['snippet']['title']
+            thumbnail = item['snippet']['thumbnails']['medium']['url']
+            channel = item['snippet']['channelTitle']
+            videos.append({
+                'id': video_id,
+                'title': title,
+                'thumbnail': thumbnail,
+                'channel': channel,
+                'url': f'https://www.youtube.com/watch?v={video_id}'
+            })
+        return videos
+    except Exception as e:
+        return []
+
 # Modify feature sections to add animations
-if choice == "💭 Query Processing":
+if choice == "🎯 1 Click":
+    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+    st.subheader("🎯 1 Click Search")
+    
+    query = st.text_input("Enter your topic:")
+    
+    if st.button("Search"):  # Add search button initialization
+        # Add horizontal scroll containers
+        st.markdown("""
+        <style>
+        .scroll-container {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px 0;
+            margin: 10px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+        .scroll-item {
+            display: inline-block;
+            margin-right: 15px;
+            vertical-align: top;
+            max-width: 300px;
+            background: rgba(255,255,255,0.07);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .scroll-item:hover {
+            transform: translateY(-5px);
+            transition: transform 0.3s ease;
+        }
+        .ai-analysis {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            border-left: 4px solid #ff4444;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # YouTube Videos Section
+        st.markdown("### YouTube Videos")
+        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
+        videos = get_youtube_videos(query)
+        for video in videos:
+            st.markdown(f'''
+            <div class="scroll-item">
+                <img src="{video['thumbnail']}" style="width:100%; border-radius:5px;">
+                <p style="margin:5px 0;"><a href="{video['url']}" target="_blank">{video['title']}</a></p>
+                <small style="color:#888;">{video['channel']}</small>
+            </div>
+            ''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Web Search Results Section
+        st.markdown("### Web Search Results")
+        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
+        results = search_duckduckgo(query)
+        if isinstance(results, list):
+            for result in results:
+                parts = result.splitlines()
+                url_line = next((line for line in parts if line.startswith("URL:")), "")
+                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
+                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
+                logo = f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
+                
+                st.markdown(f'''
+                <div class="scroll-item">
+                    <img src="{logo}" style="width:16px; vertical-align:middle;"> 
+                    <a href="{url_value}" target="_blank"><strong>{domain}</strong></a>
+                    <p style="margin:5px 0;">{result}</p>
+                </div>
+                ''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # AI Analysis Section
+        st.markdown("### AI Analysis")
+        with st.container():
+            try:
+                combined_text = f"User Query: {query}\n\nSearch Results:\n"
+                if isinstance(results, list):
+                    combined_text += "\n".join(results)
+            
+                payload = {
+                    "model": selected_model,
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant providing concise analysis."},
+                        {"role": "user", "content": f"Based on these search results, provide a comprehensive analysis of: {query}\n\nContext:\n{combined_text}"}
+                    ],
+                    "max_tokens": 500
+                }
+                headers = {"Authorization": f"Bearer {API_KEY}"}
+                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'choices' in result and len(result['choices']) > 0:
+                        analysis = result['choices'][0]['message']['content']
+                        st.markdown(f'<div class="ai-analysis">{analysis}</div>', unsafe_allow_html=True)
+                    else:
+                        st.error("No analysis generated from the AI model.")
+                else:
+                    st.error(f"Error from API: {response.text}")
+            except Exception as e:
+                st.error(f"Error during analysis: {str(e)}")
+            
+            history.append(("1 Click", query, "Search completed"))
+            save_history_to_db("1 Click", query, "Search completed")
+
+elif choice == "💭 Query Processing":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
     st.subheader("💭 Query Processing")
     user_query = st.text_input("Enter your query:")
@@ -985,7 +1135,7 @@ elif choice == "🎨 Image Search":
 
     if st.button("Generate Image"):
         image_path = download_image(prompt, width, height, model, seed)
-        st.image(image_path)
+        st.image(image_path, use_container_width=True)
         with open(image_path, "rb") as file:
             btn = st.download_button(
                 label="Download Image",
@@ -1189,3 +1339,48 @@ def format_weather_display(weather_data, location="Current Location"):
     </div>
     """
     return weather_html
+
+# Add this CSS to the existing st.markdown style section
+st.markdown("""
+<style>
+/* Add to existing styles */
+.feature-container {
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* YouTube video container styling */
+.video-container {
+    margin-bottom: 15px;
+    transition: transform 0.3s ease;
+}
+
+.video-container:hover {
+    transform: translateY(-5px);
+}
+
+/* Search results styling */
+.search-result {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 5px;
+    background: rgba(255,255,255,0.05);
+    transition: all 0.3s ease;
+}
+
+.search-result:hover {
+    background: rgba(255,255,255,0.1);
+    transform: translateX(5px);
+}
+</style>
+""", unsafe_allow_html=True)
