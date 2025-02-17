@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import os
-from duckduckgo_search import DuckDuckGoSearch  # Corrected import statement
+from duckduckgo_search import ddg  # Corrected import statement
 import PyPDF2
 from PIL import Image
 import io
@@ -173,8 +173,7 @@ import time
 def search_duckduckgo(query, max_results=10):
     try:
         results = []
-        ddgs = DuckDuckGoSearch()
-        search_results = ddgs.search(query, region="in-en", safesearch="Moderate", max_results=max_results)
+        search_results = ddg(query, region="in-en", safesearch="Moderate", max_results=max_results)
         for idx, result in enumerate(search_results, start=1):
             results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
             time.sleep(1)  # Add delay to avoid rate limit
@@ -193,8 +192,7 @@ def search_duckduckgo(query, max_results=10):
 def search_duckduckgo_incognito(query, max_results=10):
     try:
         results = []
-        ddgs = DuckDuckGoSearch()
-        search_results = ddgs.search(query, region="in-en", safesearch="Off", max_results=max_results)
+        search_results = ddg(query, region="in-en", safesearch="Off", max_results=max_results)
         for idx, result in enumerate(search_results, start=1):
             results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
         return results
