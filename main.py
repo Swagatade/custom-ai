@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import os
-from duckduckgo_search import ddg  # updated import
+from duckduckgo_search import ddg as ddg_orig  # updated import
 import PyPDF2
 from PIL import Image
 import io
@@ -170,6 +170,12 @@ def fetch_specified_location_weather(location):
 # Function to perform DuckDuckGo search
 import time
 
+# Add wrapper for ddg to remove unsupported "http2" parameter
+def ddg(query, max_results=10, **kwargs):
+    kwargs.pop("http2", None)
+    return ddg_orig(query, max_results=max_results, **kwargs)
+
+# Update search_duckduckgo to use the new ddg
 def search_duckduckgo(query, max_results=10):
     # Use ddg to search and format results with company name and logo
     results = ddg(query, max_results=max_results)
