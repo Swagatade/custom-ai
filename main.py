@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import os
-from duckduckgo_search import ddg as ddg_orig  # updated import
+from duckduckgo_search import DDS
 import PyPDF2
 from PIL import Image
 import io
@@ -11,14 +11,6 @@ import urllib.parse  # Added for URL parsing
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 import isodate
-import duckduckgo_search.duckduckgo_search as dds
-
-# Patch to remove the unsupported 'proxies' argument from DDGS.__init__
-_original_init = dds.DDGS.__init__
-def _patched_init(self, *args, **kwargs):
-    kwargs.pop('proxies', None)
-    return _original_init(self, *args, **kwargs)
-dds.DDGS.__init__ = _patched_init
 
 # Database setup
 conn = sqlite3.connect('history.db')
@@ -32,7 +24,7 @@ def save_history_to_db(feature, input_data, output_data):
     if isinstance(input_data, list):
         input_data = "\n".join(map(str, input_data))
     if isinstance(output_data, list):
-        output_data = "\n".join(map(str, input_data))
+        output_data = "\n".join(map(str, output_data))
     c.execute("INSERT INTO history (feature, input, output) VALUES (?, ?, ?)", (feature, input_data, output_data))
     conn.commit()
 
@@ -178,32 +170,39 @@ def fetch_specified_location_weather(location):
 # Function to perform DuckDuckGo search
 import time
 
-# Add wrapper for ddg to remove unsupported "http2" parameter
-def ddg(query, max_results=10, **kwargs):
-    kwargs.pop("http2", None)
-    return ddg_orig(query, max_results=max_results, **kwargs)
-
-# Update search_duckduckgo to use the new ddg
 def search_duckduckgo(query, max_results=10):
-    # Use ddg to search and format results with company name and logo
-    results = ddg(query, max_results=max_results)
-    formatted_results = []
-    for i, result in enumerate(results):
-        company_name = result.get('source', 'Unknown')
-        # Using a placeholder image for logo
-        company_logo = "https://via.placeholder.com/50"
-        formatted_results.append(f"{i+1}: {result.get('title', 'No Title')} ({company_name}) - {result.get('href', '')} [Logo: {company_logo}]")
-    return formatted_results
+    try:
+        results = []
+        with DDS() as macs:
+            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+                time.sleep(1)  # Add delay to avoid rate limit
+        return results
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        elif http_err.response.status_code == 202:
+            return [f"Rate limit exceeded. Please try again later."]
+        else:
+            return [f"HTTP error occurred: {http_err}"]
+    except Exception as e:
+        return [f"An error occurred: {e}"]
 
+# Function to perform DuckDuckGo search in incognito mode
 def search_duckduckgo_incognito(query, max_results=10):
-    # Use ddg with safesearch turned off and format results similarly
-    results = ddg(query, max_results=max_results, safesearch='Off')
-    formatted_results = []
-    for i, result in enumerate(results):
-        company_name = result.get('source', 'Unknown')
-        company_logo = "https://via.placeholder.com/50"
-        formatted_results.append(f"{i+1}: {result.get('title', 'No Title')} ({company_name}) - {result.get('href', '')} [Logo: {company_logo}]")
-    return formatted_results
+    try:
+        results = []
+        with DDS() as macs:
+            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+        return results
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        else:
+            return [f"HTTP error occurred: {http_err}"]
+    except Exception as e:
+        return [f"An error occurred: {e}"]
 
 # Function to download and display image
 def download_image(prompt, width=768, height=768, model='flux', seed=None):
@@ -1238,11 +1237,26 @@ elif choice == "🔍 Web Search":
             results = search_duckduckgo_incognito(search_query)
         else:
             results = search_duckduckgo(search_query)
+
         if isinstance(results, list):
+            st.markdown("### Search Results")
+            logo_mapping = {
+                "duckduckgo.com": "https://duckduckgo.com/assets/logo_homepage.normal.v108.svg",
+                "google.com": "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
+                "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
+            }
             for res in results:
-                st.markdown(f"**{res}**")
+                parts = res.splitlines()
+                url_line = next((line for line in parts if line.startswith("URL:")), "")
+                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
+                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
+                # Use a lightweight favicon service with smaller size (sz=16)
+                logo = logo_mapping.get(domain) or f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
+                st.markdown(f'<img src="{logo}" width="16" style="vertical-align: middle;">', unsafe_allow_html=True)
+                st.markdown(f"**{domain}**")
+                st.markdown(res)
         else:
-            st.error("No results found.")
+            st.error(results)
 
         if not incognito_mode:
             history.append(("Web Search", search_query, results))
