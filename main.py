@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import os
-from duckduckgo_search.ddgs import DDGS
+from duckduckgo_search import DDGS
 import PyPDF2
 from PIL import Image
 import io
