@@ -521,8 +521,7 @@ a {
 
 .stButton>button:hover {
     transform: translateY(-2px) !important;
-    background: linear-gradient(45deg, #ff4444, #ff0000) !important;
-    animation: pulse 2s infinite, glow 2s infinite !important;
+    box-shadow: 0 6px 20px rgba(255, 0, 0, 0.4) !important;
 }
 
 .stButton>button:hover::before {
@@ -1241,36 +1240,41 @@ elif choice == "🔍 Web Search":
     st.subheader("🔍 Web Search")
     search_query = st.text_input("Enter your search query:")
     incognito_mode = st.checkbox("Incognito Mode")
-
+    
     if st.button("Search"):
         if incognito_mode:
             results = search_duckduckgo_incognito(search_query)
         else:
             results = search_duckduckgo(search_query)
-
-        if isinstance(results, list):
+        
+        if isinstance(results, list) and results:
             st.markdown("### Search Results")
-            logo_mapping = {
-                "duckduckgo.com": "https://duckduckgo.com/assets/logo_homepage.normal.v108.svg",
-                "google.com": "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
-                "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
-            }
             for res in results:
-                parts = res.splitlines()
-                url_line = next((line for line in parts if line.startswith("URL:")), "")
-                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
-                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
-                # Use a lightweight favicon service with smaller size (sz=16)
-                logo = logo_mapping.get(domain) or f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
-                st.markdown(f'<img src="{logo}" width="16" style="vertical-align: middle;">', unsafe_allow_html=True)
-                st.markdown(f"**{domain}**")
-                st.markdown(res)
+                # Expecting res: "idx. {title}\nURL: {href}\nSnippet: {body}"
+                lines = res.splitlines()
+                # Extract title
+                title_line = lines[0]
+                parts_title = title_line.split('. ', 1)
+                title = parts_title[1] if len(parts_title) > 1 else title_line
+                url = ""
+                snippet = ""
+                for line in lines:
+                    if line.startswith("URL:"):
+                        url = line.replace("URL:", "").strip()
+                    elif line.startswith("Snippet:"):
+                        snippet = line.replace("Snippet:", "").strip()
+                domain = urllib.parse.urlparse(url).netloc.replace("www.", "")
+                logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
+                st.markdown(f"""
+                <div class="search-result">
+                    <img src="{logo_url}" alt="{domain} logo" style="width:16px; vertical-align:middle; margin-right:8px;">
+                    <strong>{title}</strong><br>
+                    <a href="{url}" target="_blank">{url}</a><br>
+                    <p>{snippet}</p>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.error(results)
-
-        if not incognito_mode:
-            history.append(("Web Search", search_query, results))
-            save_history_to_db("Web Search", search_query, results)
+            st.error("No results found.")
 
 elif choice == "📚 History":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
