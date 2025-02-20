@@ -1256,18 +1256,23 @@ elif choice == "🔍 Web Search":
                 else:
                     results = search_duckduckgo(search_query)
 
-                # Display results
+                # Inspect the results
                 if results:
                     st.markdown("### Search Results")
                     for idx, result in enumerate(results, 1):
-                        with st.container():
-                            st.markdown(f"""
-                            <div class="search-result">
-                                <h4>{idx}. {result['title']}</h4>
-                                <a href="{result['link']}" target="_blank">{result['link']}</a>
-                                <p>{result['snippet']}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
+                        # Check if the result has the expected keys
+                        if 'title' in result and 'link' in result and 'snippet' in result:
+                            with st.container():
+                                st.markdown(f"""
+                                <div class="search-result">
+                                    <h4>{idx}. {result['title']}</h4>
+                                    <a href="{result['link']}" target="_blank">{result['link']}</a>
+                                    <p>{result['snippet']}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.warning(f"Skipping result {idx} due to missing keys.")
+                            print(f"Result {idx} is missing keys: {result}")
                 else:
                     st.warning("No results found for the query.")
 
