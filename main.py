@@ -11,6 +11,8 @@ try:
         _original_init(self, *args, **kwargs)
     Client.__init__ = _new_init
 except ImportError as e:
+    # The current duckduckgo_search package no longer exports Client.
+    # This is expected; the patch is skipped.
     print("Client not available; skipping patch:", e)
 
 import PyPDF2
@@ -186,7 +188,7 @@ def search_duckduckgo(query, max_results=10):
         with DDGS() as macs:
             for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en"), start=1):
                 results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-                time.sleep(1)  # Add delay to avoid rate limit
+                time.sleep(2)  # Increased delay to 2 seconds to avoid rate-limit errors
         return results
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 429:
@@ -205,6 +207,7 @@ def search_duckduckgo_incognito(query, max_results=10):
         with DDGS() as macs:
             for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
                 results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+                time.sleep(2)  # Increased delay to 2 seconds here as well
         return results
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 429:
