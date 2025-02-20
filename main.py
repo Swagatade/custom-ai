@@ -179,6 +179,8 @@ def search_duckduckgo(query, max_results=10):
             for r in ddgs.text(query, max_results=max_results):
                 results.append(r)
                 time.sleep(0.5)  # Rate limiting
+        if not results:
+            print("No results found for the query.")
         return results
     except Exception as e:
         print(f"Search error: {str(e)}")
@@ -192,6 +194,8 @@ def search_duckduckgo_incognito(query, max_results=10):
             for r in ddgs.text(query, safesearch='Off', max_results=max_results):
                 results.append(r)
                 time.sleep(0.5)  # Rate limiting
+        if not results:
+            print("No results found for the query in incognito mode.")
         return results
     except Exception as e:
         print(f"Search error: {str(e)}")
@@ -1265,7 +1269,7 @@ elif choice == "🔍 Web Search":
                             </div>
                             """, unsafe_allow_html=True)
                 else:
-                    st.warning("No results found or an error occurred during search.")
+                    st.warning("No results found for the query.")
 
                 # Save to history if not in incognito mode
                 if not incognito_mode:
