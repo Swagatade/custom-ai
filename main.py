@@ -2,7 +2,17 @@ import streamlit as st
 import requests
 import base64
 import os
-from duckduckgo_search import DDGS, Client  # Added Client import for patching
+from duckduckgo_search import DDGS
+try:
+    from duckduckgo_search import Client
+    _original_init = Client.__init__
+    def _new_init(self, *args, **kwargs):
+        kwargs.pop('proxies', None)
+        _original_init(self, *args, **kwargs)
+    Client.__init__ = _new_init
+except ImportError as e:
+    print("Client not available; skipping patch:", e)
+
 import PyPDF2
 from PIL import Image
 import io
@@ -11,13 +21,6 @@ import urllib.parse  # Added for URL parsing
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 import isodate
-
-# Monkey-patch the Client __init__ to ignore the 'proxies' argument
-_original_init = Client.__init__
-def _new_init(self, *args, **kwargs):
-    kwargs.pop('proxies', None)
-    _original_init(self, *args, **kwargs)
-Client.__init__ = _new_init
 
 # Database setup
 conn = sqlite3.connect('history.db')
