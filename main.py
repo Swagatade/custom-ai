@@ -169,40 +169,33 @@ def fetch_specified_location_weather(location):
 
 # Function to perform DuckDuckGo search
 import time
+import asyncio
 
+# Update the DuckDuckGo search function
 def search_duckduckgo(query, max_results=10):
     try:
         results = []
-        with DDGS() as macs:
-            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en"), start=1):
-                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-                time.sleep(1)  # Add delay to avoid rate limit
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=max_results):
+                results.append(r)
+                time.sleep(0.5)  # Rate limiting
         return results
-    except requests.exceptions.HTTPError as http_err:
-        if http_err.response.status_code == 429:
-            return [f"Rate limit exceeded. Please try again later."]
-        elif http_err.response.status_code == 202:
-            return [f"Rate limit exceeded. Please try again later."]
-        else:
-            return [f"HTTP error occurred: {http_err}"]
     except Exception as e:
-        return [f"An error occurred: {e}"]
+        print(f"Search error: {str(e)}")
+        return []
 
-# Function to perform DuckDuckGo search in incognito mode
+# Update the incognito search function
 def search_duckduckgo_incognito(query, max_results=10):
     try:
         results = []
-        with DDGS() as macs:
-            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
-                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, safesearch='Off', max_results=max_results):
+                results.append(r)
+                time.sleep(0.5)  # Rate limiting
         return results
-    except requests.exceptions.HTTPError as http_err:
-        if http_err.response.status_code == 429:
-            return [f"Rate limit exceeded. Please try again later."]
-        else:
-            return [f"HTTP error occurred: {http_err}"]
     except Exception as e:
-        return [f"An error occurred: {e}"]
+        print(f"Search error: {str(e)}")
+        return []
 
 # Function to download and display image
 def download_image(prompt, width=768, height=768, model='flux', seed=None):
@@ -1251,34 +1244,36 @@ elif choice == "🔍 Web Search":
     incognito_mode = st.checkbox("Incognito Mode")
 
     if st.button("Search"):
-        if incognito_mode:
-            results = search_duckduckgo_incognito(search_query)
-        else:
-            results = search_duckduckgo(search_query)
+        with st.spinner("Searching..."):
+            try:
+                # Perform the search
+                if incognito_mode:
+                    results = search_duckduckgo_incognito(search_query)
+                else:
+                    results = search_duckduckgo(search_query)
 
-        if isinstance(results, list):
-            st.markdown("### Search Results")
-            logo_mapping = {
-                "duckduckgo.com": "https://duckduckgo.com/assets/logo_homepage.normal.v108.svg",
-                "google.com": "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
-                "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
-            }
-            for res in results:
-                parts = res.splitlines()
-                url_line = next((line for line in parts if line.startswith("URL:")), "")
-                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
-                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
-                # Use a lightweight favicon service with smaller size (sz=16)
-                logo = logo_mapping.get(domain) or f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
-                st.markdown(f'<img src="{logo}" width="16" style="vertical-align: middle;">', unsafe_allow_html=True)
-                st.markdown(f"**{domain}**")
-                st.markdown(res)
-        else:
-            st.error(results)
+                # Display results
+                if results:
+                    st.markdown("### Search Results")
+                    for idx, result in enumerate(results, 1):
+                        with st.container():
+                            st.markdown(f"""
+                            <div class="search-result">
+                                <h4>{idx}. {result['title']}</h4>
+                                <a href="{result['link']}" target="_blank">{result['link']}</a>
+                                <p>{result['snippet']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                else:
+                    st.warning("No results found or an error occurred during search.")
 
-        if not incognito_mode:
-            history.append(("Web Search", search_query, results))
-            save_history_to_db("Web Search", search_query, results)
+                # Save to history if not in incognito mode
+                if not incognito_mode:
+                    history.append(("Web Search", search_query, "Search completed"))
+                    save_history_to_db("Web Search", search_query, "Search completed")
+
+            except Exception as e:
+                st.error(f"An error occurred during search: {str(e)}")
 
 elif choice == "📚 History":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
