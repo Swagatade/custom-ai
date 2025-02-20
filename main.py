@@ -169,37 +169,40 @@ def fetch_specified_location_weather(location):
 
 # Function to perform DuckDuckGo search
 import time
-import asyncio
 
-# Update the DuckDuckGo search function
 def search_duckduckgo(query, max_results=10):
     try:
         results = []
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=max_results):
-                results.append(r)
-                time.sleep(0.5)  # Rate limiting
-        if not results:
-            print("No results found for the query.")
+        with DDGS() as macs:
+            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
+                time.sleep(1)  # Add delay to avoid rate limit
         return results
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        elif http_err.response.status_code == 202:
+            return [f"Rate limit exceeded. Please try again later."]
+        else:
+            return [f"HTTP error occurred: {http_err}"]
     except Exception as e:
-        print(f"Search error: {str(e)}")
-        return []
+        return [f"An error occurred: {e}"]
 
-# Update the incognito search function
+# Function to perform DuckDuckGo search in incognito mode
 def search_duckduckgo_incognito(query, max_results=10):
     try:
         results = []
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, safesearch='Off', max_results=max_results):
-                results.append(r)
-                time.sleep(0.5)  # Rate limiting
-        if not results:
-            print("No results found for the query in incognito mode.")
+        with DDGS() as macs:
+            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
         return results
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        else:
+            return [f"HTTP error occurred: {http_err}"]
     except Exception as e:
-        print(f"Search error: {str(e)}")
-        return []
+        return [f"An error occurred: {e}"]
 
 # Function to download and display image
 def download_image(prompt, width=768, height=768, model='flux', seed=None):
@@ -923,44 +926,32 @@ if st.sidebar.button("Clear History"):
 # Add this function before the main Streamlit app section
 def get_youtube_videos(query, max_results=5):
     try:
-        # Initialize the YouTube API client without proxies
-        youtube = build(
-            'youtube', 
-            'v3',
-            developerKey='AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk'
-        )
+        youtube = build('youtube', 'v3', 
+                       developerKey='AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk')
         
-        # Make the search request
         request = youtube.search().list(
             part='snippet',
             q=query,
             type='video',
             maxResults=max_results
         )
+        response = request.execute()
         
-        try:
-            response = request.execute()
-            
-            videos = []
-            for item in response['items']:
-                video_id = item['id']['videoId']
-                title = item['snippet']['title']
-                thumbnail = item['snippet']['thumbnails']['medium']['url']
-                channel = item['snippet']['channelTitle']
-                videos.append({
-                    'id': video_id,
-                    'title': title,
-                    'thumbnail': thumbnail,
-                    'channel': channel,
-                    'url': f'https://www.youtube.com/watch?v={video_id}'
-                })
-            return videos
-        except Exception as e:
-            print(f"Error executing YouTube request: {str(e)}")
-            return []
-            
+        videos = []
+        for item in response['items']:
+            video_id = item['id']['videoId']
+            title = item['snippet']['title']
+            thumbnail = item['snippet']['thumbnails']['medium']['url']
+            channel = item['snippet']['channelTitle']
+            videos.append({
+                'id': video_id,
+                'title': title,
+                'thumbnail': thumbnail,
+                'channel': channel,
+                'url': f'https://www.youtube.com/watch?v={video_id}'
+            })
+        return videos
     except Exception as e:
-        print(f"Error initializing YouTube client: {str(e)}")
         return []
 
 # Modify feature sections to add animations
@@ -971,114 +962,108 @@ if choice == "🎯 1 Click":
     query = st.text_input("Enter your topic:")
     
     if st.button("Search"):  # Add search button initialization
-        try:
-            # Add horizontal scroll containers
-            st.markdown("""
-            <style>
-            .scroll-container {
-                overflow-x: auto;
-                white-space: nowrap;
-                padding: 10px 0;
-                margin: 10px 0;
-                background: rgba(255,255,255,0.05);
-                border-radius: 10px;
-            }
-            .scroll-item {
-                display: inline-block;
-                margin-right: 15px;
-                vertical-align: top;
-                max-width: 300px;
-                background: rgba(255,255,255,0.07);
-                padding: 10px;
-                border-radius: 8px;
-            }
-            .scroll-item:hover {
-                transform: translateY(-5px);
-                transition: transform 0.3s ease;
-            }
-            .ai-analysis {
-                margin-top: 20px;
-                padding: 20px;
-                background: rgba(255,255,255,0.05);
-                border-radius: 10px;
-                border-left: 4px solid #ff4444;
-            }
-            </style>
-            """, unsafe_allow_html=True)
+        # Add horizontal scroll containers
+        st.markdown("""
+        <style>
+        .scroll-container {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px 0;
+            margin: 10px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+        .scroll-item {
+            display: inline-block;
+            margin-right: 15px;
+            vertical-align: top;
+            max-width: 300px;
+            background: rgba(255,255,255,0.07);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .scroll-item:hover {
+            transform: translateY(-5px);
+            transition: transform 0.3s ease;
+        }
+        .ai-analysis {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            border-left: 4px solid #ff4444;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-            # YouTube Videos Section
-            st.markdown("### YouTube Videos")
-            st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-            videos = get_youtube_videos(query)
-            if videos:  # Only show videos if we got results
-                for video in videos:
-                    st.markdown(f'''
-                    <div class="scroll-item">
-                        <img src="{video['thumbnail']}" style="width:100%; border-radius:5px;">
-                        <p style="margin:5px 0;"><a href="{video['url']}" target="_blank">{video['title']}</a></p>
-                        <small style="color:#888;">{video['channel']}</small>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            else:
-                st.warning("No YouTube videos found or there was an error fetching videos.")
-            st.markdown('</div>', unsafe_allow_html=True)
+        # YouTube Videos Section
+        st.markdown("### YouTube Videos")
+        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
+        videos = get_youtube_videos(query)
+        for video in videos:
+            st.markdown(f'''
+            <div class="scroll-item">
+                <img src="{video['thumbnail']}" style="width:100%; border-radius:5px;">
+                <p style="margin:5px 0;"><a href="{video['url']}" target="_blank">{video['title']}</a></p>
+                <small style="color:#888;">{video['channel']}</small>
+            </div>
+            ''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            # Web Search Results Section
-            st.markdown("### Web Search Results")
-            st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-            results = search_duckduckgo(query)
-            if isinstance(results, list):
-                for result in results:
-                    parts = result.splitlines()
-                    url_line = next((line for line in parts if line.startswith("URL:")), "")
-                    url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
-                    domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
-                    logo = f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
-                    
-                    st.markdown(f'''
-                    <div class="scroll-item">
-                        <img src="{logo}" style="width:16px; vertical-align:middle;"> 
-                        <a href="{url_value}" target="_blank"><strong>{domain}</strong></a>
-                        <p style="margin:5px 0;">{result}</p>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            # AI Analysis Section
-            st.markdown("### AI Analysis")
-            with st.container():
-                try:
-                    combined_text = f"User Query: {query}\n\nSearch Results:\n"
-                    if isinstance(results, list):
-                        combined_text += "\n".join(results)
+        # Web Search Results Section
+        st.markdown("### Web Search Results")
+        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
+        results = search_duckduckgo(query)
+        if isinstance(results, list):
+            for result in results:
+                parts = result.splitlines()
+                url_line = next((line for line in parts if line.startswith("URL:")), "")
+                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
+                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
+                logo = f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
                 
-                    payload = {
-                        "model": selected_model,
-                        "messages": [
-                            {"role": "system", "content": "You are a helpful assistant providing concise analysis."},
-                            {"role": "user", "content": f"Based on these search results, provide a comprehensive analysis of: {query}\n\nContext:\n{combined_text}"}
-                        ],
-                        "max_tokens": 500
-                    }
-                    headers = {"Authorization": f"Bearer {API_KEY}"}
-                    response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
-                    
-                    if response.status_code == 200:
-                        result = response.json()
-                        if 'choices' in result and len(result['choices']) > 0:
-                            analysis = result['choices'][0]['message']['content']
-                            st.markdown(f'<div class="ai-analysis">{analysis}</div>', unsafe_allow_html=True)
-                        else:
-                            st.error("No analysis generated from the AI model.")
+                st.markdown(f'''
+                <div class="scroll-item">
+                    <img src="{logo}" style="width:16px; vertical-align:middle;"> 
+                    <a href="{url_value}" target="_blank"><strong>{domain}</strong></a>
+                    <p style="margin:5px 0;">{result}</p>
+                </div>
+                ''', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # AI Analysis Section
+        st.markdown("### AI Analysis")
+        with st.container():
+            try:
+                combined_text = f"User Query: {query}\n\nSearch Results:\n"
+                if isinstance(results, list):
+                    combined_text += "\n".join(results)
+            
+                payload = {
+                    "model": selected_model,
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant providing concise analysis."},
+                        {"role": "user", "content": f"Based on these search results, provide a comprehensive analysis of: {query}\n\nContext:\n{combined_text}"}
+                    ],
+                    "max_tokens": 500
+                }
+                headers = {"Authorization": f"Bearer {API_KEY}"}
+                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if 'choices' in result and len(result['choices']) > 0:
+                        analysis = result['choices'][0]['message']['content']
+                        st.markdown(f'<div class="ai-analysis">{analysis}</div>', unsafe_allow_html=True)
                     else:
-                        st.error(f"Error from API: {response.text}")
-                except Exception as e:
-                    st.error(f"Error during analysis: {str(e)}")
-                
-                history.append(("1 Click", query, "Search completed"))
-                save_history_to_db("1 Click", query, "Search completed")
-        except Exception as e:
-            st.error(f"An error occurred during search: {str(e)}")
+                        st.error("No analysis generated from the AI model.")
+                else:
+                    st.error(f"Error from API: {response.text}")
+            except Exception as e:
+                st.error(f"Error during analysis: {str(e)}")
+            
+            history.append(("1 Click", query, "Search completed"))
+            save_history_to_db("1 Click", query, "Search completed")
 
 elif choice == "💭 Query Processing":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
@@ -1248,41 +1233,34 @@ elif choice == "🔍 Web Search":
     incognito_mode = st.checkbox("Incognito Mode")
 
     if st.button("Search"):
-        with st.spinner("Searching..."):
-            try:
-                # Perform the search
-                if incognito_mode:
-                    results = search_duckduckgo_incognito(search_query)
-                else:
-                    results = search_duckduckgo(search_query)
+        if incognito_mode:
+            results = search_duckduckgo_incognito(search_query)
+        else:
+            results = search_duckduckgo(search_query)
 
-                # Inspect the results
-                if results:
-                    st.markdown("### Search Results")
-                    for idx, result in enumerate(results, 1):
-                        # Check if the result has the expected keys
-                        if 'title' in result and 'link' in result and 'snippet' in result:
-                            with st.container():
-                                st.markdown(f"""
-                                <div class="search-result">
-                                    <h4>{idx}. {result['title']}</h4>
-                                    <a href="{result['link']}" target="_blank">{result['link']}</a>
-                                    <p>{result['snippet']}</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.warning(f"Skipping result {idx} due to missing keys.")
-                            print(f"Result {idx} is missing keys: {result}")
-                else:
-                    st.warning("No results found for the query.")
+        if isinstance(results, list):
+            st.markdown("### Search Results")
+            logo_mapping = {
+                "duckduckgo.com": "https://duckduckgo.com/assets/logo_homepage.normal.v108.svg",
+                "google.com": "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
+                "bing.com": "https://www.bing.com/sa/simg/bing_p_rr_teal_min.ico",
+            }
+            for res in results:
+                parts = res.splitlines()
+                url_line = next((line for line in parts if line.startswith("URL:")), "")
+                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
+                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
+                # Use a lightweight favicon service with smaller size (sz=16)
+                logo = logo_mapping.get(domain) or f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
+                st.markdown(f'<img src="{logo}" width="16" style="vertical-align: middle;">', unsafe_allow_html=True)
+                st.markdown(f"**{domain}**")
+                st.markdown(res)
+        else:
+            st.error(results)
 
-                # Save to history if not in incognito mode
-                if not incognito_mode:
-                    history.append(("Web Search", search_query, "Search completed"))
-                    save_history_to_db("Web Search", search_query, "Search completed")
-
-            except Exception as e:
-                st.error(f"An error occurred during search: {str(e)}")
+        if not incognito_mode:
+            history.append(("Web Search", search_query, results))
+            save_history_to_db("Web Search", search_query, results)
 
 elif choice == "📚 History":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
