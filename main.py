@@ -926,8 +926,10 @@ if st.sidebar.button("Clear History"):
 # Add this function before the main Streamlit app section
 def get_youtube_videos(query, max_results=5):
     try:
+        # Modified build call with cache_discovery=False to avoid proxies issue
         youtube = build('youtube', 'v3', 
-                       developerKey='AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk')
+                       developerKey='AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk',
+                       cache_discovery=False)
         
         request = youtube.search().list(
             part='snippet',
