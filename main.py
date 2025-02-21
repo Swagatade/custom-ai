@@ -176,42 +176,34 @@ def search_duckduckgo(query, max_results=10, retries=0):
     MAX_RETRIES = 3
     try:
         results = []
-        with DDGS() as macs:
-            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en"), start=1):
-                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-                time.sleep(2)
+        with DDGS() as ddgs:
+            search_results = ddgs.text(query, max_results=max_results)
+            for idx, result in enumerate(search_results, start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['link']}\nSnippet: {result['body']}")
+                time.sleep(1)  # Reduced delay
         return results
-    except requests.exceptions.HTTPError as http_err:
-        error_str = str(http_err)
-        if (("links.duckduckgo.com/d.js" in error_str) or 
-            (http_err.response and http_err.response.status_code in (429, 202))) and retries < MAX_RETRIES:
-            time.sleep(15)
-            return search_duckduckgo(query, max_results, retries+1)
-        else:
-            return [f"Rate limit exceeded. Please try again later. (Error: {http_err})"]
     except Exception as e:
-        return [f"An error occurred: {e}"]
+        if retries < MAX_RETRIES:
+            time.sleep(5)  # Wait before retry
+            return search_duckduckgo(query, max_results, retries+1)
+        return [f"An error occurred: {str(e)}"]
 
 # Modified search_duckduckgo_incognito with increased MAX_RETRIES and delay for rate limit errors
 def search_duckduckgo_incognito(query, max_results=10, retries=0):
     MAX_RETRIES = 3
     try:
         results = []
-        with DDGS() as macs:
-            for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
-                results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-                time.sleep(2)
+        with DDGS() as ddgs:
+            search_results = ddgs.text(query, max_results=max_results, safesearch='Off')
+            for idx, result in enumerate(search_results, start=1):
+                results.append(f"{idx}. {result['title']}\nURL: {result['link']}\nSnippet: {result['body']}")
+                time.sleep(1)  # Reduced delay
         return results
-    except requests.exceptions.HTTPError as http_err:
-        error_str = str(http_err)
-        if (("links.duckduckgo.com/d.js" in error_str) or 
-            (http_err.response and http_err.response.status_code in (429, 202))) and retries < MAX_RETRIES:
-            time.sleep(15)
-            return search_duckduckgo_incognito(query, max_results, retries+1)
-        else:
-            return [f"Rate limit exceeded. Please try again later. (Error: {http_err})"]
     except Exception as e:
-        return [f"An error occurred: {e}"]
+        if retries < MAX_RETRIES:
+            time.sleep(5)  # Wait before retry
+            return search_duckduckgo_incognito(query, max_results, retries+1)
+        return [f"An error occurred: {str(e)}"]
 
 # Function to download and display image
 def download_image(prompt, width=768, height=768, model='flux', seed=None):
@@ -1025,23 +1017,41 @@ elif choice == "🎨 Image Search":
     st.markdown('<div="feature-container">', unsafe_allow_html=True)
     st.subheader("🎨 Image Search")
     prompt = st.text_input("Enter a prompt for image generation:")
-    width = 768
-    height =768
+    width = st.slider("Image Width", min_value=256, max_value=1024, value=512, step=256)
+    height = st.slider("Image Height", min_value=256, max_value=1024, value=512, step=256)
     model = "flux"
     seed = st.number_input("Seed", value=42, step=1)
 
     if st.button("Generate Image"):
-        image_path = download_image(prompt, width, height, model, seed)
-        st.image(image_path, use_container_width=True)
-        with open(image_path, "rb") as file:
-            btn = st.download_button(
-                label="Download Image",
-                data=file,
-                file_name="generated_image.jpg",
-                mime="image/jpeg"
-            )
-        history.append(("Image Search", prompt, image_path))
-        save_history_to_db("Image Search", prompt, image_path)
+        try:
+            with st.spinner("Generating image..."):
+                image_path = download_image(prompt, width, height, model, seed)
+                # Check if file exists and is not empty
+                if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
+                    try:
+                        # Open and verify the image before displaying
+                        img = Image.open(image_path)
+                        img.verify()  # Verify it's a valid image
+                        # Close and reopen the image (verify closes the file)
+                        img = Image.open(image_path)
+                        st.image(img, use_column_width=True)  # Changed from use_container_width
+                        
+                        # Provide download option
+                        with open(image_path, "rb") as file:
+                            btn = st.download_button(
+                                label="Download Image",
+                                data=file,
+                                file_name="generated_image.jpg",
+                                mime="image/jpeg"
+                            )
+                        history.append(("Image Search", prompt, image_path))
+                        save_history_to_db("Image Search", prompt, image_path)
+                    except Exception as img_error:
+                        st.error(f"Error displaying image: {str(img_error)}")
+                else:
+                    st.error("Failed to generate image.")
+        except Exception as e:
+            st.error(f"Error during image generation: {str(e)}")
 
 elif choice == "🖼️ Picture Explanation":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
