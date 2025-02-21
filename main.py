@@ -1147,17 +1147,29 @@ elif choice == "🔍 Web Search":
                 st.markdown("### Search Results")
                 for result in results:
                     try:
-                        domain = urllib.parse.urlparse(result['link']).netloc
+                        # Split the result string into components
+                        lines = result.split('\n')
+                        title_line = lines[0]
+                        
+                        # Extract title (remove the index number)
+                        title = title_line.split('. ', 1)[1] if '. ' in title_line else title_line
+                        
+                        # Extract URL and snippet
+                        url = next((line.replace('URL:', '').strip() for line in lines if line.startswith('URL:')), '')
+                        snippet = next((line.replace('Snippet:', '').strip() for line in lines if line.startswith('Snippet:')), '')
+                        
+                        # Get domain for favicon
+                        domain = urllib.parse.urlparse(url).netloc
                         favicon_url = f"https://www.google.com/s2/favicons?domain={domain}"
                         
                         st.markdown(f"""
                         <div class="search-result" style="border: 1px solid rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-bottom: 15px; background: rgba(255,255,255,0.05);">
                             <div style="display: flex; align-items: center; margin-bottom: 5px;">
                                 <img src="{favicon_url}" style="width: 16px; height: 16px; margin-right: 10px;" onerror="this.style.display='none'"/>
-                                <strong style="color: #00fff2;">{result['title']}</strong>
+                                <strong style="color: #00fff2;">{title}</strong>
                             </div>
-                            <a href="{result['link']}" target="_blank" style="color: #4d8cff; text-decoration: none; font-size: 0.9em;">{result['link']}</a>
-                            <p style="margin-top: 5px; color: #e1e1e1; font-size: 0.9em;">{result['snippet']}</p>
+                            <a href="{url}" target="_blank" style="color: #4d8cff; text-decoration: none; font-size: 0.9em;">{url}</a>
+                            <p style="margin-top: 5px; color: #e1e1e1; font-size: 0.9em;">{snippet}</p>
                         </div>
                         """, unsafe_allow_html=True)
                     except Exception as e:
