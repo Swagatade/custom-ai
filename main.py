@@ -1140,40 +1140,30 @@ elif choice == "🔍 Web Search":
     incognito_mode = st.checkbox("Incognito Mode")
     
     if st.button("Search"):
-        if incognito_mode:
-            results = search_duckduckgo_incognito(search_query)
-        else:
-            results = search_duckduckgo(search_query)
-        
-        if isinstance(results, list) and results:
-            st.markdown("### Search Results")
-            for res in results:
-                if "Rate limit exceeded" in res:
-                    st.error(res)
-                    continue
-                lines = res.splitlines()
-                title_line = lines[0]
-                parts_title = title_line.split('. ', 1)
-                title = parts_title[1] if len(parts_title) > 1 else title_line
-                url = ""
-                snippet = ""
-                for line in lines:
-                    if line.startswith("URL:"):
-                        url = line.replace("URL:", "").strip()
-                    elif line.startswith("Snippet:"):
-                        snippet = line.replace("Snippet:", "").strip()
-                domain = urllib.parse.urlparse(url).netloc.replace("www.", "")
-                logo_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
-                st.markdown(f"""
-                <div class="search-result">
-                    <img src="{logo_url}" alt="{domain} logo" style="width:16px; vertical-align:middle; margin-right:8px;">
-                    <strong>{title}</strong><br>
-                    <a href="{url}" target="_blank">{url}</a><br>
-                    <p>{snippet}</p>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.error("No results found.")
+        with st.spinner("Searching..."):
+            results = search_duckduckgo_incognito(search_query) if incognito_mode else search_duckduckgo(search_query)
+            
+            if results:
+                st.markdown("### Search Results")
+                for result in results:
+                    try:
+                        domain = urllib.parse.urlparse(result['link']).netloc
+                        favicon_url = f"https://www.google.com/s2/favicons?domain={domain}"
+                        
+                        st.markdown(f"""
+                        <div class="search-result" style="border: 1px solid rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-bottom: 15px; background: rgba(255,255,255,0.05);">
+                            <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                                <img src="{favicon_url}" style="width: 16px; height: 16px; margin-right: 10px;" onerror="this.style.display='none'"/>
+                                <strong style="color: #00fff2;">{result['title']}</strong>
+                            </div>
+                            <a href="{result['link']}" target="_blank" style="color: #4d8cff; text-decoration: none; font-size: 0.9em;">{result['link']}</a>
+                            <p style="margin-top: 5px; color: #e1e1e1; font-size: 0.9em;">{result['snippet']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    except Exception as e:
+                        st.error(f"Error displaying result: {str(e)}")
+            else:
+                st.warning("No results found.")
 
 elif choice == "📚 History":
     st.markdown('<div="feature-container">', unsafe_allow_html=True)
