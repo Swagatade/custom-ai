@@ -3,39 +3,10 @@ import requests
 import base64
 import os
 from duckduckgo_search import DDGS
-
+import webbrowser
 import PyPDF2
 from PIL import Image
 import io
-import sqlite3
-import urllib.parse  # Added for URL parsing
-from googleapiclient.discovery import build
-from youtube_transcript_api import YouTubeTranscriptApi
-import isodate
-
-# Database setup
-conn = sqlite3.connect('history.db')
-c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS history
-             (id INTEGER PRIMARY KEY, feature TEXT, input TEXT, output TEXT)''')
-conn.commit()
-
-def save_history_to_db(feature, input_data, output_data):
-    # Convert list-type parameters to a string representation
-    if isinstance(input_data, list):
-        input_data = "\n".join(map(str, input_data))
-    if isinstance(output_data, list):
-        output_data = "\n".join(map(str, output_data))
-    c.execute("INSERT INTO history (feature, input, output) VALUES (?, ?, ?)", (feature, input_data, output_data))
-    conn.commit()
-
-def load_history_from_db():
-    c.execute("SELECT feature, input, output FROM history")
-    return c.fetchall()
-
-def clear_history_from_db():
-    c.execute("DELETE FROM history")
-    conn.commit()
 
 # API Configuration
 API_BASE_URL = "https://openrouter.ai/api/v1"
@@ -111,12 +82,12 @@ def llm_pipeline(filepath, query):
     input_text = file_preprocessing(filepath)
 
     payload = {
-        "model": selected_model,  # Use the globally selected model
+        "model": selected_model,
         "messages": [
             {"role": "system", "content": "You are an assistant summarizing a document."},
             {"role": "user", "content": f"Summarize the following text:\n{input_text}\nBased on the document, answer the question: {query}"}
         ],
-        "max_tokens": 10000
+        "max_tokens":10000
     }
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -124,10 +95,7 @@ def llm_pipeline(filepath, query):
     response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
     if response.status_code == 200:
         result = response.json()
-        if 'choices' in result:
-            return result['choices'][0]['message']['content']
-        else:
-            return "Error: 'choices' not found in the response."
+        return result['choices'][0]['message']['content']
     else:
         return f"Error during summarization: {response.json().get('message', 'Unknown error')}"
 
@@ -145,65 +113,77 @@ def fetch_current_location_weather():
 
         if weather_response.status_code == 200:
             weather_data = weather_response.json()["data"]["values"]
-            return st.markdown(format_weather_display(weather_data), unsafe_allow_html=True)
+            return (
+                f"**Current Location Weather:**\n"
+                f"- Temperature: {weather_data['temperature']}\u00b0C\n"
+                f"- Apparent Temperature: {weather_data['temperatureApparent']}\u00b0C\n"
+                f"- Humidity: {weather_data['humidity']}%\n"
+                f"- Wind Speed: {weather_data['windSpeed']} m/s\n"
+                f"- Cloud Cover: {weather_data['cloudCover']}%\n"
+                f"- Visibility: {weather_data['visibility']} km\n"
+                f"- UV Index: {weather_data['uvIndex']}"
+            )
         else:
-            return st.error(f"Failed to fetch weather data. Status Code: {weather_response.status_code}")
+            return f"Failed to fetch weather data. Status Code: {weather_response.status_code}, Message: {weather_response.text}"
     except Exception as e:
-        return st.error(f"An error occurred: {e}")
+        return f"An error occurred: {e}"
 
 # Function to fetch weather for a specified location
 def fetch_specified_location_weather(location):
     try:
         if not location.strip():
-            return st.error("Location cannot be empty.")
+            return "Location cannot be empty."
         url = f"https://api.tomorrow.io/v4/weather/realtime?location={location}&apikey={WEATHER_API_KEY}"
         headers = {"accept": "application/json"}
         response = requests.get(url, headers=headers)
 
         if response.status_code == 200:
-            weather_data = response.json()["data"]["values"]
-            return st.markdown(format_weather_display(weather_data, location), unsafe_allow_html=True)
+            weather_data = response.json()["data"]
+            return (
+                f"**Weather in {location}:**\n"
+                f"- Time: {weather_data['time']}\n"
+                f"- Temperature: {weather_data['values']['temperature']}\u00b0C\n"
+                f"- Apparent Temperature: {weather_data['values']['temperatureApparent']}\u00b0C\n"
+                f"- Humidity: {weather_data['values']['humidity']}%\n"
+                f"- Wind Speed: {weather_data['values']['windSpeed']} m/s\n"
+                f"- Cloud Cover: {weather_data['values']['cloudCover']}%\n"
+                f"- Visibility: {weather_data['values']['visibility']} km\n"
+                f"- UV Index: {weather_data['values']['uvIndex']}"
+            )
         else:
-            return st.error(f"Failed to fetch weather data for {location}.")
+            return f"Failed to fetch weather data for {location}. Status Code: {response.status_code}, Message: {response.text}"
     except Exception as e:
-        return st.error(f"An error occurred: {e}")
+        return f"An error occurred: {e}"
 
 # Function to perform DuckDuckGo search
-import time
-
-# Modified search_duckduckgo with increased MAX_RETRIES and delay for rate limit errors
-def search_duckduckgo(query, max_results=10, retries=0):
-    MAX_RETRIES = 3
+def search_duckduckgo(query, max_results=10):
     try:
         results = []
         with DDGS() as ddgs:
-            search_results = ddgs.text(query, max_results=max_results)
-            for idx, result in enumerate(search_results, start=1):
-                results.append(f"{idx}. {result['title']}\nURL: {result['link']}\nSnippet: {result['body']}")
-                time.sleep(1)  # Reduced delay
+            for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en"), start=1):
+                logo_url = f"https://logo.clearbit.com/{result['href'].split('/')[2]}"
+                domain = result['href'].split('/')[2].replace('www.', '')
+                if 'wikipedia.org' in domain:
+                    company_name = 'Wikipedia'
+                else:
+                    company_name = domain.split('.')[0]  # Clean company name
+                result_entry = (
+                    f"<div style='margin-bottom: 20px;'>"
+                    f"<img src='{logo_url}' alt='Company Logo' style='width: 50px; height: 50px; vertical-align: middle; margin-right: 10px;'>"
+                    f"<span style='font-size: 20px; font-weight: bold;'>{company_name}</span><br>"
+                    f"<a href='{result['href']}' target='_blank'>{result['href']}</a>"
+                    f"<p>{result['body']}</p>"
+                    f"</div>"
+                )
+                results.append(result_entry)
         return results
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 429:
+            return [f"Rate limit exceeded. Please try again later."]
+        else:
+            return [f"HTTP error occurred: {http_err}"]
     except Exception as e:
-        if retries < MAX_RETRIES:
-            time.sleep(5)  # Wait before retry
-            return search_duckduckgo(query, max_results, retries+1)
-        return [f"An error occurred: {str(e)}"]
-
-# Modified search_duckduckgo_incognito with increased MAX_RETRIES and delay for rate limit errors
-def search_duckduckgo_incognito(query, max_results=10, retries=0):
-    MAX_RETRIES = 3
-    try:
-        results = []
-        with DDGS() as ddgs:
-            search_results = ddgs.text(query, max_results=max_results, safesearch='Off')
-            for idx, result in enumerate(search_results, start=1):
-                results.append(f"{idx}. {result['title']}\nURL: {result['link']}\nSnippet: {result['body']}")
-                time.sleep(1)  # Reduced delay
-        return results
-    except Exception as e:
-        if retries < MAX_RETRIES:
-            time.sleep(5)  # Wait before retry
-            return search_duckduckgo_incognito(query, max_results, retries+1)
-        return [f"An error occurred: {str(e)}"]
+        return [f"An error occurred: {e}"]
 
 # Function to download and display image
 def download_image(prompt, width=768, height=768, model='flux', seed=None):
@@ -213,47 +193,6 @@ def download_image(prompt, width=768, height=768, model='flux', seed=None):
     with open(image_path, 'wb') as file:
         file.write(response.content)
     return image_path
-
-# Move format_weather_display here
-def format_weather_display(weather_data, location="Current Location"):
-    icons = {
-        "temperature": "🌡️",
-        "apparent": "🌡️",
-        "humidity": "💧",
-        "wind": "💨",
-        "cloud": "☁️",
-        "visibility": "👁️",
-        "uv": "☀️",
-        "time": "🕒"
-    }
-    weather_html = f"""
-    <div class="weather-container">
-        <h2>{icons.get("location", "📍")} {location} Weather</h2>
-        <div class="weather-icon">🌤️</div>
-        <div class="weather-info">
-            {icons["temperature"]} Temperature: <span class="weather-value">{weather_data.get("temperature", "N/A")}°C</span>
-        </div>
-        <div class="weather-info">
-            {icons["apparent"]} Feels Like: <span class="weather-value">{weather_data.get("temperatureApparent", "N/A")}°C</span>
-        </div>
-        <div class="weather-info">
-            {icons["humidity"]} Humidity: <span class="weather-value">{weather_data.get("humidity", "N/A")}%</span>
-        </div>
-        <div class="weather-info">
-            {icons["wind"]} Wind Speed: <span class="weather-value">{weather_data.get("windSpeed", "N/A")} m/s</span>
-        </div>
-        <div class="weather-info">
-            {icons["cloud"]} Cloud Cover: <span class="weather-value">{weather_data.get("cloudCover", "N/A")}%</span>
-        </div>
-        <div class="weather-info">
-            {icons["visibility"]} Visibility: <span class="weather-value">{weather_data.get("visibility", "N/A")} km</span>
-        </div>
-        <div class="weather-info">
-            {icons["uv"]} UV Index: <span class="weather-value">{weather_data.get("uvIndex", "N/A")}</span>
-        </div>
-    </div>
-    """
-    return weather_html
 
 # Function to summarize an image
 def summarize_image(image_path, query):
@@ -268,7 +207,7 @@ def summarize_image(image_path, query):
                 encoded_image = base64.b64encode(output.getvalue()).decode("utf-8")
         
         payload = {
-            "model": selected_model,  # Use the globally selected model
+            "model": selected_model,
             "messages": [
                 {"role": "system", "content": "You are an assistant providing a detailed description of an image."},
                 {"role": "user", "content": f"Describe the image in detail based on the following query: {query}\n{encoded_image}"}
@@ -310,653 +249,27 @@ def compress_pdf(input_pdf_path, output_pdf_path):
         return f"Error compressing PDF: {e}"
 
 # Function to handle web search queries
-def handle_web_search(query, incognito=False):
-    if incognito:
-        results = search_duckduckgo_incognito(query)
-    else:
-        results = search_duckduckgo(query)
+def handle_web_search(query):
+    results = search_duckduckgo(query)
     return "\n".join(results)
-
-# Function to fetch weather for the device's current location
-def fetch_device_location_weather(latitude, longitude):
-    try:
-        weather_url = f"https://api.tomorrow.io/v4/weather/realtime?location={latitude},{longitude}&apikey={WEATHER_API_KEY}"
-        headers = {"accept": "application/json"}
-        weather_response = requests.get(weather_url, headers=headers)
-
-        if weather_response.status_code == 200:
-            weather_data = weather_response.json()["data"]["values"]
-            return st.markdown(format_weather_display(weather_data), unsafe_allow_html=True)
-        else:
-            return st.error(f"Failed to fetch weather data. Status Code: {weather_response.status_code}")
-    except Exception as e:
-        return st.error(f"An error occurred: {e}")
-
-# Add JavaScript to get device location
-st.markdown("""
-<script>
-navigator.geolocation.getCurrentPosition(
-    function(position) {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-        document.getElementById('latitude').value = latitude;
-        document.getElementById('longitude').value = longitude;
-        document.getElementById('location-form').submit();
-    },
-    function(error) {
-        console.error("Error getting location: ", error);
-    }
-);
-</script>
-<form id="location-form" method="post">
-    <input type="hidden" id="latitude" name="latitude">
-    <input type="hidden" id="longitude" name="longitude">
-</form>
-""", unsafe_allow_html=True)
-
-# Handle form submission to get weather data
-query_params = st.query_params
-if query_params.get("latitude") and query_params.get("longitude"):
-    latitude = query_params.get("latitude")[0]
-    longitude = query_params.get("longitude")[0]
-    fetch_device_location_weather(latitude, longitude)
 
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
 
-# Update the CSS section with dark theme
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
-
-/* Modern container styling with dark theme */
-.stApp {
-    font-family: 'Poppins', sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
-    color: #e1e1e1 !important;
-}
-
-/* Animated title with darker theme */
-.title-animation {
-    background: linear-gradient(120deg, #00fff2 0%, #4d8cff 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: gradient 5s ease infinite;
-}
-
-/* Glowing button effect with darker colors */
-.stButton>button {
-    background: linear-gradient(45deg, #4d8cff, #00fff2) !important;
-    color: #1a1a2e !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 0.5rem 1rem !important;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 4px 15px rgba(0, 255, 242, 0.2) !important;
-    font-weight: bold !important;
-}
-
-.stButton>button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(0, 255, 242, 0.4) !important;
-}
-
-/* Card-like containers with dark theme */
-.css-1r6slb0 {
-    background: rgba(255, 255, 255, 0.05) !important;
-    backdrop-filter: blur(10px) !important;
-    border-radius: 20px !important;
-    padding: 20px !important;
-    box-shadow: 0 8px 32px 0 rgba(0, 255, 242, 0.1) !important;
-    border: 1px solid rgba(0, 255, 242, 0.18) !important;
-    margin-bottom: 20px !important;
-}
-
-/* Sidebar styling with dark theme */
-.css-1d391kg {
-    background: rgba(26, 26, 46, 0.95) !important;
-    backdrop-filter: blur(15px) !important;
-}
-
-/* Input fields styling with dark theme */
-.stTextInput>div>div>input {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(0, 255, 242, 0.2) !important;
-    border-radius: 10px !important;
-    color: #e1e1e1 !important;
-    padding: 10px !important;
-}
-
-/* Selectbox styling with dark theme */
-.stSelectbox>div>div {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border-radius: 10px !important;
-    color: #e1e1e1 !important;
-}
-
-/* Progress bar with darker theme */
-.progress-bar {
-    height: 4px;
-    background: linear-gradient(90deg, #00fff2 0%, #4d8cff 100%);
-    animation: progress 2s ease-in-out;
-}
-
-/* Loading spinner with darker theme */
-.loading-spinner {
-    border: 5px solid rgba(255, 255, 255, 0.1);
-    border-top: 5px solid #00fff2;
-}
-
-/* Text color adjustments for dark theme */
-p, span, label, .stMarkdown {
-    color: #e1e1e1 !important;
-}
-
-/* Header text colors */
-h1, h2, h3, h4, h5, h6 {
-    color: #ffffff !important;
-}
-
-/* Links color */
-a {
-    color: #00fff2 !important;
-}
-
-/* Markdown text color */
-.stMarkdown div {
-    color: #e1e1e1 !important;
-}
-
-/* Enhanced button animation keyframes */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-@keyframes glow {
-    0% { box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.8); }
-    100% { box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
-}
-
-/* Updated button styling with red theme */
-.stButton>button {
-    background: linear-gradient(45deg, #ff0000, #ff4444) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 0.6rem 1.2rem !important;
-    font-weight: bold !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-    transition: all 0.3s ease !important;
-    animation: pulse 2s infinite !important;
-    position: relative !important;
-    overflow: hidden !important;
-    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.3) !important;
-}
-
-.stButton>button::before {
-    content: '' !important;
-    position: absolute !important;
-    top: -50% !important;
-    left: -50% !important;
-    width: 200% !important;
-    height: 200% !important;
-    background: rgba(255, 255, 255, 0.1) !important;
-    transform: rotate(45deg) !important;
-    transition: all 0.3s ease !important;
-}
-
-.stButton>button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(255, 0, 0, 0.4) !important;
-}
-
-.stButton>button:hover::before {
-    left: 100% !important;
-}
-
-.stButton>button:active {
-    transform: translateY(1px) !important;
-    box-shadow: 0 2px 10px rgba(255, 0, 0, 0.2) !important;
-}
-
-/* Enhanced Button Animations */
-@keyframes neon-glow {
-    0% {
-        box-shadow: 0 0 5px #ff0000,
-                   0 0 10px #ff0000,
-                   0 0 15px #ff0000,
-                   0 0 20px #ff0000;
-    }
-    50% {
-        box-shadow: 0 0 10px #ff0000,
-                   0 0 20px #ff0000,
-                   0 0 30px #ff0000,
-                   0 0 40px #ff0000;
-    }
-    100% {
-        box-shadow: 0 0 5px #ff0000,
-                   0 0 10px #ff0000,
-                   0 0 15px #ff0000,
-                   0 0 20px #ff0000;
-    }
-}
-
-@keyframes button-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.02); }
-    100% { transform: scale(1); }
-}
-
-@keyframes shine {
-    0% { background-position: -100% 50%; }
-    100% { background-position: 200% 50%; }
-}
-
-/* Updated Button Styling */
-.stButton>button {
-    background: linear-gradient(45deg, #ff0000, #ff4444, #ff0000) !important;
-    background-size: 200% 200% !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 10px !important;
-    padding: 0.6rem 1.2rem !important;
-    font-weight: bold !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-    transition: all 0.3s ease !important;
-    position: relative !important;
-    overflow: hidden !important;
-    animation: button-pulse 2s infinite, shine 3s infinite !important;
-    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5),
-                0 0 20px rgba(255, 0, 0, 0.3),
-                0 0 30px rgba(255, 0, 0, 0.2),
-                inset 0 0 15px rgba(255, 255, 255, 0.1) !important;
-}
-
-.stButton>button::before {
-    content: '' !important;
-    position: absolute !important;
-    top: -50% !important;
-    left: -50% !important;
-    width: 200% !important;
-    height: 200% !important;
-    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%) !important;
-    transform: rotate(45deg) !important;
-    transition: all 0.5s ease !important;
-}
-
-.stButton>button:hover {
-    transform: translateY(-3px) !important;
-    background-position: right center !important;
-    animation: neon-glow 1.5s infinite, button-pulse 2s infinite !important;
-    box-shadow: 0 0 15px rgba(255, 0, 0, 0.7),
-                0 0 30px rgba(255, 0, 0, 0.5),
-                0 0 45px rgba(255, 0, 0, 0.3),
-                inset 0 0 20px rgba(255, 255, 255, 0.2) !important;
-}
-
-.stButton>button:hover::before {
-    left: 100% !important;
-    transition: 0.8s all ease !important;
-}
-
-.stButton>button:active {
-    transform: translateY(2px) !important;
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.8),
-                inset 0 0 10px rgba(255, 0, 0, 0.4) !important;
-}
-
-/* Add 3D effect on hover */
-.stButton>button::after {
-    content: '' !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    background: linear-gradient(rgba(255,255,255,0.2), transparent) !important;
-    clip-path: polygon(0 0, 100% 0, 100% 25%, 0 45%) !important;
-    transition: all 0.3s ease !important;
-}
-
-.stButton>button:hover::after {
-    transform: translateY(2px) !important;
-    opacity: 0.7 !important;
-}
-
-/* Add ripple effect on click */
-@keyframes ripple {
-    to {
-        transform: scale(4);
-        opacity: 0;
-    }
-}
-
-.stButton>button .ripple {
-    position: absolute !important;
-    border-radius: 50% !important;
-    transform: scale(0) !important;
-    animation: ripple 0.6s linear !important;
-    background-color: rgba(255, 255, 255, 0.7) !important;
-}
-
-</style>
-
-<script>
-function createRipple(event) {
-    const button = event.currentTarget;
-    const circle = document.createElement('span');
-    const diameter = Math.max(button.clientWidth, button.clientHeight);
-    const radius = diameter / 2;
-
-    circle.style.width = circle.style.height = `${diameter}px`;
-    circle.style.left = `${event.clientX - button.offsetLeft - radius}px`;
-    circle.style.top = `${event.clientY - button.offsetTop - radius}px`;
-    circle.classList.add('ripple');
-
-    const ripple = button.getElementsByClassName('ripple')[0];
-    if (ripple) {
-        ripple.remove();
-    }
-
-    button.appendChild(circle);
-}
-
-document.querySelectorAll('.stButton>button').forEach(button => {
-    button.addEventListener('click', createRipple);
-});
-</script>
-
-<style>
-/* ... existing CSS ... */
-
-/* Weather Icons and Animations */
-@keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-    100% { transform: translateY(0px); }
-}
-
-@keyframes pulse-weather {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
-}
-
-.weather-container {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 20px;
-    margin: 10px 0;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    animation: float 6s ease-in-out infinite;
-}
-
-.weather-icon {
-    font-size: 2.5em;
-    margin: 10px 0;
-    display: inline-block;
-    animation: pulse-weather 2s infinite;
-}
-
-.weather-info {
-    display: flex;
-    align-items: center;
-    margin: 8px 0;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-    transition: all 0.3s ease;
-}
-
-.weather-info:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateX(5px);
-}
-
-.weather-value {
-    color: #ff4444;
-    font-weight: bold;
-    margin-left: 10px;
-}
-
-</style>
-
-<style>
-/* Add glitch and broken light flickering effect for headlines */
-@keyframes broken-flicker {
-    0% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px #fff,
-            0 0 10px #fff,
-            0 0 20px #ff0000,
-            0 0 40px #ff0000,
-            0 0 80px #ff0000;
-    }
-    2% { 
-        opacity: 0.1;
-        text-shadow: none;
-    }
-    4% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px #fff,
-            0 0 10px #fff,
-            0 0 20px #ff0000;
-    }
-    19% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px #fff,
-            0 0 10px #fff,
-            0 0 20px #ff0000,
-            0 0 40px #ff0000;
-    }
-    21% { 
-        opacity: 0.2;
-        text-shadow: none;
-    }
-    23% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px #fff,
-            0 0 10px #fff,
-            0 0 20px #ff0000,
-            0 0 40px #ff0000;
-    }
-    80% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px #fff,
-            0 0 10px #fff,
-            0 0 20px #ff0000;
-    }
-    83% { 
-        opacity: 0.4;
-        text-shadow: none;
-    }
-    87% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px #fff,
-            0 0 10px #fff,
-            0 0 20px #ff0000;
-    }
-}
-
-h1, h2, h3, h4, h5, h6, .subheader {
-    color: #ffffff !important;
-    animation: broken-flicker 5s infinite;
-    text-shadow: 
-        0 0 5px #fff,
-        0 0 10px #fff,
-        0 0 20px #ff0000,
-        0 0 40px #ff0000,
-        0 0 80px #ff0000;
-}
-
-/* Enhanced glitch effect for main title */
-.title-animation {
-    animation: broken-flicker 5s infinite, gradient 5s ease infinite !important;
-    position: relative;
-}
-
-/* Additional distortion effect */
-.title-animation::before {
-    content: attr(data-text);
-    position: absolute;
-    left: 2px;
-    text-shadow: -1px 0 #ff0000;
-    top: 0;
-    color: #ffffff;
-    overflow: hidden;
-    clip: rect(0, 900px, 0, 0);
-    animation: broken-noise-anim 3s infinite linear alternate-reverse;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-/* Update headline styling with Caribbean green and softer glow */
-@keyframes soft-flicker {
-    0% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px rgba(0, 206, 201, 0.5),
-            0 0 10px rgba(0, 206, 201, 0.3),
-            0 0 15px rgba(0, 206, 201, 0.2);
-    }
-    50% { 
-        opacity: 0.95;
-        text-shadow: 
-            0 0 7px rgba(0, 206, 201, 0.6),
-            0 0 12px rgba(0, 206, 201, 0.4),
-            0 0 17px rgba(0, 206, 201, 0.3);
-    }
-    100% { 
-        opacity: 1;
-        text-shadow: 
-            0 0 5px rgba(0, 206, 201, 0.5),
-            0 0 10px rgba(0, 206, 201, 0.3),
-            0 0 15px rgba(0, 206, 201, 0.2);
-    }
-}
-
-h1, h2, h3, h4, h5, h6, .subheader {
-    color: #00CEC9 !important;
-    animation: soft-flicker 3s infinite;
-    text-shadow: 
-        0 0 5px rgba(0, 206, 201, 0.5),
-        0 0 10px rgba(0, 206, 201, 0.3),
-        0 0 15px rgba(0, 206, 201, 0.2);
-}
-
-/* Update title animation */
-.title-animation {
-    background: linear-gradient(120deg, #00CEC9 0%, #81ECEC 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: soft-flicker 3s infinite;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Add loading animation function
-def show_loading_animation():
-    with st.spinner(''):
-        st.markdown("""
-            <div class="loading-spinner"></div>
-            <div class="progress-bar"></div>
-        """, unsafe_allow_html=True)
-
-# Modified title with natural emoji and animation
-st.markdown("""
-<h1>
-    <span style="font-size: 32px; margin-right: 10px;">🤖</span>
-    <span class="title-animation">Multitool Chat Assistant v2.0</span>
-</h1>
-
-<style>
-.title-animation {
-    background: linear-gradient(120deg, #00fff2 0%, #4d8cff 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Add feature icons to the menu
-feature_icons = {
-    "Query Processing": "💭",
-    "Weather Information": "🌤️",
-    "PDF Summarization": "📄",
-    "Image Search": "🎨",
-    "Picture Explanation": "🖼️",
-    "Web Search": "🔍",
-    "History": "📚"
-}
-
-# Update menu with icons
-menu = [f"{feature_icons[item]} {item}" for item in ["Query Processing", "Weather Information", "PDF Summarization", 
-                                                    "Image Search", "Picture Explanation", "Web Search", "History"]]
-
 # Sidebar Menu
+menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "History"]
 choice = st.sidebar.selectbox("Choose a Feature", menu)
 
-history = st.session_state.get("history", load_history_from_db())
+history = st.session_state.get("history", [])
 
 # Add a button to clear history
 if st.sidebar.button("Clear History"):
     history = []
     st.session_state["history"] = history
-    clear_history_from_db()
     st.success("History cleared successfully.")
 
-# Add this function before the main Streamlit app section
-def get_youtube_videos(query, max_results=5):
-    try:
-        youtube = build('youtube', 'v3', 
-                       developerKey='AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk')
-        
-        request = youtube.search().list(
-            part='snippet',
-            q=query,
-            type='video',
-            maxResults=max_results
-        )
-        response = request.execute()
-        
-        videos = []
-        for item in response['items']:
-            video_id = item['id']['videoId']
-            title = item['snippet']['title']
-            thumbnail = item['snippet']['thumbnails']['medium']['url']
-            channel = item['snippet']['channelTitle']
-            videos.append({
-                'id': video_id,
-                'title': title,
-                'thumbnail': thumbnail,
-                'channel': channel,
-                'url': f'https://www.youtube.com/watch?v={video_id}'
-            })
-        return videos
-    except Exception as e:
-        return []
-
-# Modified feature sections to remove LangChain usage
-if choice == "💭 Query Processing":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-    st.subheader("💭 Query Processing")
+if choice == "Query Processing":
+    st.subheader("Query Processing")
     user_query = st.text_input("Enter your query:")
 
     if st.button("Submit Query"):
@@ -968,7 +281,7 @@ if choice == "💭 Query Processing":
                 result = fetch_current_location_weather()
         else:
             payload = {
-                "model": selected_model,  # Use the globally selected model
+                "model": selected_model,
                 "messages": [
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": user_query}
@@ -990,72 +303,42 @@ if choice == "💭 Query Processing":
 
         st.write(result)
         history.append(("Query Processing", user_query, result))
-        save_history_to_db("Query Processing", user_query, result)
 
-elif choice == "🌤️ Weather Information":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-    st.subheader("🌤️ Weather Information")
-    
-    # Add tabs for different weather views
-    weather_tab1, weather_tab2 = st.tabs(["📍 Current Location", "🔍 Search Location"])
-    
-    with weather_tab1:
-        if st.button("Get Current Weather", key="current_weather"):
-            show_loading_animation()
-            fetch_current_location_weather()
-    
-    with weather_tab2:
-        location = st.text_input("Enter a location:", placeholder="e.g., London, UK")
-        if st.button("Get Weather", key="search_weather"):
-            if location:
-                show_loading_animation()
-                fetch_specified_location_weather(location)
-                history.append(("Weather Information", location, "Weather data fetched"))
-                save_history_to_db("Weather Information", location, "Weather data fetched")
+elif choice == "Weather Information":
+    st.subheader("Weather Information")
+    location = st.text_input("Enter a location for weather information (leave blank for current location):")
 
-elif choice == "🎨 Image Search":
-    st.markdown('<div="feature-container">', unsafe_allow_html=True)
-    st.subheader("🎨 Image Search")
+    if st.button("Get Weather"):
+        if location.strip():
+            result = fetch_specified_location_weather(location)
+        else:
+            result = fetch_current_location_weather()
+
+        st.write(result)
+        history.append(("Weather Information", location or "Current Location", result))
+
+elif choice == "Image Search":
+    st.subheader("Image Search")
     prompt = st.text_input("Enter a prompt for image generation:")
-    width = st.slider("Image Width", min_value=256, max_value=1024, value=512, step=256)
-    height = st.slider("Image Height", min_value=256, max_value=1024, value=512, step=256)
+    width = 768
+    height =768
     model = "flux"
     seed = st.number_input("Seed", value=42, step=1)
 
     if st.button("Generate Image"):
-        try:
-            with st.spinner("Generating image..."):
-                image_path = download_image(prompt, width, height, model, seed)
-                # Check if file exists and is not empty
-                if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
-                    try:
-                        # Open and verify the image before displaying
-                        img = Image.open(image_path)
-                        img.verify()  # Verify it's a valid image
-                        # Close and reopen the image (verify closes the file)
-                        img = Image.open(image_path)
-                        st.image(img, use_column_width=True)  # Changed from use_container_width
-                        
-                        # Provide download option
-                        with open(image_path, "rb") as file:
-                            btn = st.download_button(
-                                label="Download Image",
-                                data=file,
-                                file_name="generated_image.jpg",
-                                mime="image/jpeg"
-                            )
-                        history.append(("Image Search", prompt, image_path))
-                        save_history_to_db("Image Search", prompt, image_path)
-                    except Exception as img_error:
-                        st.error(f"Error displaying image: {str(img_error)}")
-                else:
-                    st.error("Failed to generate image.")
-        except Exception as e:
-            st.error(f"Error during image generation: {str(e)}")
+        image_path = download_image(prompt, width, height, model, seed)
+        st.image(image_path)
+        with open(image_path, "rb") as file:
+            btn = st.download_button(
+                label="Download Image",
+                data=file,
+                file_name="generated_image.jpg",
+                mime="image/jpeg"
+            )
+        history.append(("Image Search", prompt, image_path))
 
-elif choice == "🖼️ Picture Explanation":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-    st.subheader("🖼️ Picture Explanation")
+elif choice == "Picture Explanation":
+    st.subheader("Picture Explanation")
     uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
     if uploaded_image is not None:
@@ -1080,11 +363,9 @@ elif choice == "🖼️ Picture Explanation":
                 else:
                     st.write(summary)
                 history.append(("Picture Explanation", uploaded_image.name, summary))
-                save_history_to_db("Picture Explanation", uploaded_image.name, summary)
 
-elif choice == "📄 PDF Summarization":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-    st.subheader("📄 PDF Summarization")
+elif choice == "PDF Summarization":
+    st.subheader("PDF Summarization")
     uploaded_file = st.file_uploader("Upload a PDF file", type="pdf")
 
     if uploaded_file is not None:
@@ -1131,61 +412,26 @@ elif choice == "📄 PDF Summarization":
                             st.markdown(f"**{i}.** {summary}")
                             answers.append(summary)
                     history.append(("PDF Summarization", queries_list, answers))
-                    save_history_to_db("PDF Summarization", queries_list, answers)
 
-elif choice == "🔍 Web Search":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-    st.subheader("🔍 Web Search")
+elif choice == "Web Search":
+    st.subheader("Web Search")
     search_query = st.text_input("Enter your search query:")
-    incognito_mode = st.checkbox("Incognito Mode")
-    
-    if st.button("Search"):
-        with st.spinner("Searching..."):
-            results = search_duckduckgo_incognito(search_query) if incognito_mode else search_duckduckgo(search_query)
-            
-            if results:
-                st.markdown("### Search Results")
-                for result in results:
-                    try:
-                        # Split the result string into components
-                        lines = result.split('\n')
-                        title_line = lines[0]
-                        
-                        # Extract title (remove the index number)
-                        title = title_line.split('. ', 1)[1] if '. ' in title_line else title_line
-                        
-                        # Extract URL and snippet
-                        url = next((line.replace('URL:', '').strip() for line in lines if line.startswith('URL:')), '')
-                        snippet = next((line.replace('Snippet:', '').strip() for line in lines if line.startswith('Snippet:')), '')
-                        
-                        # Get domain for favicon
-                        domain = urllib.parse.urlparse(url).netloc
-                        favicon_url = f"https://www.google.com/s2/favicons?domain={domain}"
-                        
-                        st.markdown(f"""
-                        <div class="search-result" style="border: 1px solid rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin-bottom: 15px; background: rgba(255,255,255,0.05);">
-                            <div style="display: flex; align-items: center; margin-bottom: 5px;">
-                                <img src="{favicon_url}" style="width: 16px; height: 16px; margin-right: 10px;" onerror="this.style.display='none'"/>
-                                <strong style="color: #00fff2;">{title}</strong>
-                            </div>
-                            <a href="{url}" target="_blank" style="color: #4d8cff; text-decoration: none; font-size: 0.9em;">{url}</a>
-                            <p style="margin-top: 5px; color: #e1e1e1; font-size: 0.9em;">{snippet}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    except Exception as e:
-                        st.error(f"Error displaying result: {str(e)}")
-            else:
-                st.warning("No results found.")
 
-elif choice == "📚 History":
-    st.markdown('<div="feature-container">', unsafe_allow_html=True)
-    st.subheader("📚 History")
+    if st.button("Search"):
+        result = handle_web_search(search_query)
+        if "Rate limit exceeded" in result:
+            st.error(result)
+        else:
+            st.markdown(result, unsafe_allow_html=True)
+        history.append(("Web Search", search_query, result))
+
+elif choice == "History":
+    st.subheader("History")
     if history:
         # Add a button to clear all history
         if st.button("Clear All History"):
             history = []
             st.session_state["history"] = history
-            clear_history_from_db()
             st.success("All history cleared successfully.")
         
         for idx, entry in enumerate(history, start=1):
@@ -1195,107 +441,8 @@ elif choice == "📚 History":
             if st.button(f"Delete Entry {idx}", key=f"delete_{idx}"):
                 history.pop(idx-1)
                 st.session_state["history"] = history
-                c.execute("DELETE FROM history WHERE id = ?", (idx,))
-                conn.commit()
                 st.experimental_rerun()
     else:
         st.write("No history available.")
 
 st.session_state["history"] = history
-
-# Add footer
-st.markdown("---")
-st.markdown("""
-    <div style='text-align: center; animation: fadeIn 2s;'>
-        <p style='color: #666; font-size: 0.8em;'>
-            Created with ❤️ by Swagata Dey | Version 2.0
-        </p>
-    </div>
-""", unsafe_allow_html=True)
-
-# Update the weather display functions to include icons
-def format_weather_display(weather_data, location="Current Location"):
-    icons = {
-        "temperature": "🌡️",
-        "apparent": "🌡️",
-        "humidity": "💧",
-        "wind": "💨",
-        "cloud": "☁️",
-        "visibility": "👁️",
-        "uv": "☀️",
-        "time": "🕒"
-    }
-    
-    weather_html = f"""
-    <div class="weather-container">
-        <h2>{icons.get("location", "📍")} {location} Weather</h2>
-        <div class="weather-icon">🌤️</div>
-        <div class="weather-info">
-            {icons["temperature"]} Temperature: <span class="weather-value">{weather_data.get("temperature", "N/A")}°C</span>
-        </div>
-        <div class="weather-info">
-            {icons["apparent"]} Feels Like: <span class="weather-value">{weather_data.get("temperatureApparent", "N/A")}°C</span>
-        </div>
-        <div class="weather-info">
-            {icons["humidity"]} Humidity: <span class="weather-value">{weather_data.get("humidity", "N/A")}%</span>
-        </div>
-        <div class="weather-info">
-            {icons["wind"]} Wind Speed: <span class="weather-value">{weather_data.get("windSpeed", "N/A")} m/s</span>
-        </div>
-        <div class="weather-info">
-            {icons["cloud"]} Cloud Cover: <span class="weather-value">{weather_data.get("cloudCover", "N/A")}%</span>
-        </div>
-        <div class="weather-info">
-            {icons["visibility"]} Visibility: <span class="weather-value">{weather_data.get("visibility", "N/A")} km</span>
-        </div>
-        <div class="weather-info">
-            {icons["uv"]} UV Index: <span class="weather-value">{weather_data.get("uvIndex", "N/A")}</span>
-        </div>
-    </div>
-    """
-    return weather_html
-
-# Add this CSS to the existing st.markdown style section
-st.markdown("""
-<style>
-/* Add to existing styles */
-.feature-container {
-    animation: slideIn 0.5s ease-out;
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateX(-20px);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-/* YouTube video container styling */
-.video-container {
-    margin-bottom: 15px;
-    transition: transform 0.3s ease;
-}
-
-.video-container:hover {
-    transform: translateY(-5px);
-}
-
-/* Search results styling */
-.search-result {
-    margin-bottom: 15px;
-    padding: 10px;
-    border-radius: 5px;
-    background: rgba(255,255,255,0.05);
-    transition: all 0.3s ease;
-}
-
-.search-result:hover {
-    background: rgba(255,255,255,0.1);
-    transform: translateX(5px);
-}
-</style>
-""", unsafe_allow_html=True)
