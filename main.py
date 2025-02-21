@@ -159,7 +159,7 @@ def fetch_specified_location_weather(location):
 def search_duckduckgo(query, max_results=10):
     try:
         results = []
-        # Ensure DDGS is initialized WITHOUT any proxies parameter.
+        # Initialize DDGS without the 'proxies' parameter.
         with DDGS() as ddgs:
             for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en"), start=1):
                 logo_url = f"https://logo.clearbit.com/{result['href'].split('/')[2]}"
@@ -167,7 +167,7 @@ def search_duckduckgo(query, max_results=10):
                 if 'wikipedia.org' in domain:
                     company_name = 'Wikipedia'
                 else:
-                    company_name = domain.split('.')[0]  # Clean company name
+                    company_name = domain.split('.')[0]
                 result_entry = (
                     f"<div style='margin-bottom: 20px;'>"
                     f"<img src='{logo_url}' alt='Company Logo' style='width: 50px; height: 50px; vertical-align: middle; margin-right: 10px;'>"
