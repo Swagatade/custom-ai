@@ -7,6 +7,9 @@ import webbrowser
 import PyPDF2
 from PIL import Image
 import io
+import sqlite3
+from datetime import datetime
+import googleapiclient.discovery
 
 # API Configuration
 API_BASE_URL = "https://openrouter.ai/api/v1"
@@ -254,20 +257,152 @@ def handle_web_search(query):
     results = search_duckduckgo(query)
     return "\n".join(results)
 
+# Function to search YouTube videos
+def search_youtube(query, max_results=5):
+    try:
+        # Initialize the YouTube API client
+        youtube = googleapiclient.discovery.build(
+            "youtube", "v3", 
+            developerKey="AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk"  # Use hardcoded API key
+        )
+
+        # Execute search request
+        request = youtube.search().list(
+            part="snippet",
+            q=query,
+            type="video",
+            maxResults=max_results
+        )
+        response = request.execute()
+
+        results = []
+        for item in response.get('items', []):
+            video_id = item['id']['videoId']
+            title = item['snippet']['title']
+            description = item['snippet']['description']
+            thumbnail = item['snippet']['thumbnails']['medium']['url']
+            
+            result_entry = (
+                f"<div style='margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>"
+                f"<img src='{thumbnail}' style='width: 320px; height: 180px;'><br>"
+                f"<a href='https://www.youtube.com/watch?v={video_id}' target='_blank'>"
+                f"<h3>{title}</h3></a>"
+                f"<p>{description}</p>"
+                f"</div>"
+            )
+            results.append(result_entry)
+        return results
+    except Exception as e:
+        return [f"An error occurred: {str(e)}"]
+
+# Function to perform combined search
+def perform_combined_search(query):
+    results = {
+        'web': [],
+        'ai': '',
+        'youtube': []
+    }
+    
+    # Web Search
+    web_results = search_duckduckgo(query, max_results=5)
+    results['web'] = web_results
+
+    # AI Model Response
+    payload = {
+        "model": selected_model,
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": query}
+        ],
+        "max_tokens": 1000
+    }
+    headers = {
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    try:
+        response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+        if response.status_code == 200:
+            result_data = response.json()
+            if 'choices' in result_data:
+                results['ai'] = result_data['choices'][0]['message']['content']
+    except Exception as e:
+        results['ai'] = f"AI Error: {str(e)}"
+
+    # YouTube Search
+    youtube_results = search_youtube(query)
+    results['youtube'] = youtube_results
+
+    return results
+
+# Initialize database
+def init_db():
+    conn = sqlite3.connect("history.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            feature TEXT,
+            input TEXT,
+            output TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def upgrade_db():
+    conn = sqlite3.connect("history.db")
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(history)")
+    columns = [col[1] for col in c.fetchall()]
+    if 'timestamp' not in columns:
+        # Add column without DEFAULT clause.
+        c.execute("ALTER TABLE history ADD COLUMN timestamp DATETIME")
+        # Set current timestamp for existing rows.
+        c.execute("UPDATE history SET timestamp = CURRENT_TIMESTAMP WHERE timestamp IS NULL")
+    conn.commit()
+    conn.close()
+
+def add_history(feature, input_data, output_data):
+    conn = sqlite3.connect("history.db")
+    c = conn.cursor()
+    c.execute("INSERT INTO history (feature, input, output) VALUES (?, ?, ?)",
+              (feature, str(input_data), str(output_data)))
+    conn.commit()
+    conn.close()
+
+def get_all_history():
+    conn = sqlite3.connect("history.db")
+    c = conn.cursor()
+    c.execute("SELECT id, feature, input, output, timestamp FROM history ORDER BY id")
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def clear_all_history():
+    conn = sqlite3.connect("history.db")
+    c = conn.cursor()
+    c.execute("DELETE FROM history")
+    conn.commit()
+    conn.close()
+
+def delete_history_entry(entry_id):
+    conn = sqlite3.connect("history.db")
+    c = conn.cursor()
+    c.execute("DELETE FROM history WHERE id=?", (entry_id,))
+    conn.commit()
+    conn.close()
+
+# Initialize DB on startup
+init_db()
+upgrade_db()
+
 # Main Streamlit App
 st.title("Multitool Chat Assistant")
 
 # Sidebar Menu
-menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "History"]
+menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "1-Click Search", "History"]
 choice = st.sidebar.selectbox("Choose a Feature", menu)
-
-history = st.session_state.get("history", [])
-
-# Add a button to clear history
-if st.sidebar.button("Clear History"):
-    history = []
-    st.session_state["history"] = history
-    st.success("History cleared successfully.")
 
 if choice == "Query Processing":
     st.subheader("Query Processing")
@@ -303,7 +438,7 @@ if choice == "Query Processing":
                 result = f"Error in query processing: {response.text}"
 
         st.write(result)
-        history.append(("Query Processing", user_query, result))
+        add_history("Query Processing", user_query, result)
 
 elif choice == "Weather Information":
     st.subheader("Weather Information")
@@ -316,7 +451,7 @@ elif choice == "Weather Information":
             result = fetch_current_location_weather()
 
         st.write(result)
-        history.append(("Weather Information", location or "Current Location", result))
+        add_history("Weather Information", location or "Current Location", result)
 
 elif choice == "Image Search":
     st.subheader("Image Search")
@@ -336,7 +471,7 @@ elif choice == "Image Search":
                 file_name="generated_image.jpg",
                 mime="image/jpeg"
             )
-        history.append(("Image Search", prompt, image_path))
+        add_history("Image Search", prompt, image_path)
 
 elif choice == "Picture Explanation":
     st.subheader("Picture Explanation")
@@ -363,7 +498,7 @@ elif choice == "Picture Explanation":
                     st.error(summary)
                 else:
                     st.write(summary)
-                history.append(("Picture Explanation", uploaded_image.name, summary))
+                add_history("Picture Explanation", uploaded_image.name, summary)
 
 elif choice == "PDF Summarization":
     st.subheader("PDF Summarization")
@@ -412,7 +547,7 @@ elif choice == "PDF Summarization":
                             summary = llm_pipeline(filepath, query)
                             st.markdown(f"**{i}.** {summary}")
                             answers.append(summary)
-                    history.append(("PDF Summarization", queries_list, answers))
+                    add_history("PDF Summarization", queries_list, answers)
 
 elif choice == "Web Search":
     st.subheader("Web Search")
@@ -424,26 +559,53 @@ elif choice == "Web Search":
             st.error(result)
         else:
             st.markdown(result, unsafe_allow_html=True)
-        history.append(("Web Search", search_query, result))
+        add_history("Web Search", search_query, result)
+
+elif choice == "1-Click Search":
+    st.subheader("1-Click Search")
+    search_query = st.text_input("Enter your search query:")
+
+    if st.button("Search Everything"):
+        with st.spinner("Searching across multiple platforms..."):
+            results = perform_combined_search(search_query)
+            
+            # Display AI Response
+            st.subheader("AI Response")
+            st.write(results['ai'])
+            
+            # Display Web Results
+            st.subheader("Web Results")
+            st.markdown("\n".join(results['web']), unsafe_allow_html=True)
+            
+            # Display YouTube Results
+            st.subheader("YouTube Results")
+            st.markdown("\n".join(results['youtube']), unsafe_allow_html=True)
+            
+            # Add to history
+            add_history("1-Click Search", search_query, 
+                       f"AI Response: {results['ai'][:100]}...\n" +
+                       f"Web Results: {len(results['web'])} items\n" +
+                       f"YouTube Results: {len(results['youtube'])} items")
 
 elif choice == "History":
     st.subheader("History")
-    if history:
-        # Add a button to clear all history
-        if st.button("Clear All History"):
-            history = []
-            st.session_state["history"] = history
-            st.success("All history cleared successfully.")
-        
-        for idx, entry in enumerate(history, start=1):
-            st.markdown(f"**{idx}. Feature:** {entry[0]}")
-            st.markdown(f"**Input:** {entry[1]}")
-            st.markdown(f"**Output:** {entry[2]}")
-            if st.button(f"Delete Entry {idx}", key=f"delete_{idx}"):
-                history.pop(idx-1)
-                st.session_state["history"] = history
-                st.experimental_rerun()
+    # Clear history button
+    if st.button("Clear All History"):
+        clear_all_history()
+        st.success("All history cleared successfully.")
+        if hasattr(st, "experimental_rerun"):
+            st.experimental_rerun()
+    # Load history from database and display
+    db_history = get_all_history()
+    if db_history:
+        for entry in db_history:
+            entry_id, feature, input_data, output_data, timestamp = entry
+            st.markdown(f"**ID:** {entry_id} | **Feature:** {feature} | **Timestamp:** {timestamp}")
+            st.markdown(f"**Input:** {input_data}")
+            st.markdown(f"**Output:** {output_data}")
+            if st.button(f"Delete Entry {entry_id}", key=f"delete_{entry_id}"):
+                delete_history_entry(entry_id)
+                if hasattr(st, "experimental_rerun"):
+                    st.experimental_rerun()
     else:
         st.write("No history available.")
-
-st.session_state["history"] = history
