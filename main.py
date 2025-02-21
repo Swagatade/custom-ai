@@ -3,17 +3,6 @@ import requests
 import base64
 import os
 from duckduckgo_search import DDGS
-try:
-    from duckduckgo_search import Client
-    _original_init = Client.__init__
-    def _new_init(self, *args, **kwargs):
-        kwargs.pop('proxies', None)
-        _original_init(self, *args, **kwargs)
-    Client.__init__ = _new_init
-except ImportError as e:
-    # The current duckduckgo_search package no longer exports Client.
-    # This is expected; the patch is skipped.
-    print("Client not available; skipping patch:", e)
 
 import PyPDF2
 from PIL import Image
@@ -182,38 +171,45 @@ def fetch_specified_location_weather(location):
 # Function to perform DuckDuckGo search
 import time
 
-def search_duckduckgo(query, max_results=10):
+# Modified search_duckduckgo with increased MAX_RETRIES and delay for rate limit errors
+def search_duckduckgo(query, max_results=10, retries=0):
+    MAX_RETRIES = 3
     try:
         results = []
         with DDGS() as macs:
             for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en"), start=1):
                 results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-                time.sleep(2)  # Increased delay to 2 seconds to avoid rate-limit errors
+                time.sleep(2)
         return results
     except requests.exceptions.HTTPError as http_err:
-        if http_err.response.status_code == 429:
-            return [f"Rate limit exceeded. Please try again later."]
-        elif http_err.response.status_code == 202:
-            return [f"Rate limit exceeded. Please try again later."]
+        error_str = str(http_err)
+        if (("links.duckduckgo.com/d.js" in error_str) or 
+            (http_err.response and http_err.response.status_code in (429, 202))) and retries < MAX_RETRIES:
+            time.sleep(15)
+            return search_duckduckgo(query, max_results, retries+1)
         else:
-            return [f"HTTP error occurred: {http_err}"]
+            return [f"Rate limit exceeded. Please try again later. (Error: {http_err})"]
     except Exception as e:
         return [f"An error occurred: {e}"]
 
-# Function to perform DuckDuckGo search in incognito mode
-def search_duckduckgo_incognito(query, max_results=10):
+# Modified search_duckduckgo_incognito with increased MAX_RETRIES and delay for rate limit errors
+def search_duckduckgo_incognito(query, max_results=10, retries=0):
+    MAX_RETRIES = 3
     try:
         results = []
         with DDGS() as macs:
             for idx, result in enumerate(macs.text(query, max_results=max_results, region="in-en", safesearch="Off"), start=1):
                 results.append(f"{idx}. {result['title']}\nURL: {result['href']}\nSnippet: {result['body']}")
-                time.sleep(2)  # Increased delay to 2 seconds here as well
+                time.sleep(2)
         return results
     except requests.exceptions.HTTPError as http_err:
-        if http_err.response.status_code == 429:
-            return [f"Rate limit exceeded. Please try again later."]
+        error_str = str(http_err)
+        if (("links.duckduckgo.com/d.js" in error_str) or 
+            (http_err.response and http_err.response.status_code in (429, 202))) and retries < MAX_RETRIES:
+            time.sleep(15)
+            return search_duckduckgo_incognito(query, max_results, retries+1)
         else:
-            return [f"HTTP error occurred: {http_err}"]
+            return [f"Rate limit exceeded. Please try again later. (Error: {http_err})"]
     except Exception as e:
         return [f"An error occurred: {e}"]
 
@@ -915,12 +911,11 @@ feature_icons = {
     "Image Search": "🎨",
     "Picture Explanation": "🖼️",
     "Web Search": "🔍",
-    "History": "📚",
-    "1 Click": "🎯"
+    "History": "📚"
 }
 
 # Update menu with icons
-menu = [f"{feature_icons[item]} {item}" for item in ["1 Click", "Query Processing", "Weather Information", "PDF Summarization", 
+menu = [f"{feature_icons[item]} {item}" for item in ["Query Processing", "Weather Information", "PDF Summarization", 
                                                     "Image Search", "Picture Explanation", "Web Search", "History"]]
 
 # Sidebar Menu
@@ -966,118 +961,8 @@ def get_youtube_videos(query, max_results=5):
     except Exception as e:
         return []
 
-# Modify feature sections to add animations
-if choice == "🎯 1 Click":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-    st.subheader("🎯 1 Click Search")
-    
-    query = st.text_input("Enter your topic:")
-    
-    if st.button("Search"):  # Add search button initialization
-        # Add horizontal scroll containers
-        st.markdown("""
-        <style>
-        .scroll-container {
-            overflow-x: auto;
-            white-space: nowrap;
-            padding: 10px 0;
-            margin: 10px 0;
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-        }
-        .scroll-item {
-            display: inline-block;
-            margin-right: 15px;
-            vertical-align: top;
-            max-width: 300px;
-            background: rgba(255,255,255,0.07);
-            padding: 10px;
-            border-radius: 8px;
-        }
-        .scroll-item:hover {
-            transform: translateY(-5px);
-            transition: transform 0.3s ease;
-        }
-        .ai-analysis {
-            margin-top: 20px;
-            padding: 20px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            border-left: 4px solid #ff4444;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # YouTube Videos Section
-        st.markdown("### YouTube Videos")
-        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-        videos = get_youtube_videos(query)
-        for video in videos:
-            st.markdown(f'''
-            <div class="scroll-item">
-                <img src="{video['thumbnail']}" style="width:100%; border-radius:5px;">
-                <p style="margin:5px 0;"><a href="{video['url']}" target="_blank">{video['title']}</a></p>
-                <small style="color:#888;">{video['channel']}</small>
-            </div>
-            ''', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Web Search Results Section
-        st.markdown("### Web Search Results")
-        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-        results = search_duckduckgo(query)
-        if isinstance(results, list):
-            for result in results:
-                parts = result.splitlines()
-                url_line = next((line for line in parts if line.startswith("URL:")), "")
-                url_value = url_line.split("URL:")[-1].strip() if "URL:" in url_line else ""
-                domain = urllib.parse.urlparse(url_value).netloc.replace("www.", "")
-                logo = f"https://www.google.com/s2/favicons?domain={domain}&sz=16"
-                
-                st.markdown(f'''
-                <div class="scroll-item">
-                    <img src="{logo}" style="width:16px; vertical-align:middle;"> 
-                    <a href="{url_value}" target="_blank"><strong>{domain}</strong></a>
-                    <p style="margin:5px 0;">{result}</p>
-                </div>
-                ''', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # AI Analysis Section
-        st.markdown("### AI Analysis")
-        with st.container():
-            try:
-                combined_text = f"User Query: {query}\n\nSearch Results:\n"
-                if isinstance(results, list):
-                    combined_text += "\n".join(results)
-            
-                payload = {
-                    "model": selected_model,
-                    "messages": [
-                        {"role": "system", "content": "You are a helpful assistant providing concise analysis."},
-                        {"role": "user", "content": f"Based on these search results, provide a comprehensive analysis of: {query}\n\nContext:\n{combined_text}"}
-                    ],
-                    "max_tokens": 500
-                }
-                headers = {"Authorization": f"Bearer {API_KEY}"}
-                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if 'choices' in result and len(result['choices']) > 0:
-                        analysis = result['choices'][0]['message']['content']
-                        st.markdown(f'<div class="ai-analysis">{analysis}</div>', unsafe_allow_html=True)
-                    else:
-                        st.error("No analysis generated from the AI model.")
-                else:
-                    st.error(f"Error from API: {response.text}")
-            except Exception as e:
-                st.error(f"Error during analysis: {str(e)}")
-            
-            history.append(("1 Click", query, "Search completed"))
-            save_history_to_db("1 Click", query, "Search completed")
-
-elif choice == "💭 Query Processing":
+# Modified feature sections to remove LangChain usage
+if choice == "💭 Query Processing":
     st.markdown('<div class="feature-container">', unsafe_allow_html=True)
     st.subheader("💭 Query Processing")
     user_query = st.text_input("Enter your query:")
@@ -1137,7 +1022,7 @@ elif choice == "🌤️ Weather Information":
                 save_history_to_db("Weather Information", location, "Weather data fetched")
 
 elif choice == "🎨 Image Search":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+    st.markdown('<div="feature-container">', unsafe_allow_html=True)
     st.subheader("🎨 Image Search")
     prompt = st.text_input("Enter a prompt for image generation:")
     width = 768
@@ -1253,9 +1138,10 @@ elif choice == "🔍 Web Search":
         if isinstance(results, list) and results:
             st.markdown("### Search Results")
             for res in results:
-                # Expecting res: "idx. {title}\nURL: {href}\nSnippet: {body}"
+                if "Rate limit exceeded" in res:
+                    st.error(res)
+                    continue
                 lines = res.splitlines()
-                # Extract title
                 title_line = lines[0]
                 parts_title = title_line.split('. ', 1)
                 title = parts_title[1] if len(parts_title) > 1 else title_line
@@ -1280,7 +1166,7 @@ elif choice == "🔍 Web Search":
             st.error("No results found.")
 
 elif choice == "📚 History":
-    st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+    st.markdown('<div="feature-container">', unsafe_allow_html=True)
     st.subheader("📚 History")
     if history:
         # Add a button to clear all history
