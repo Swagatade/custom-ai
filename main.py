@@ -487,7 +487,7 @@ upgrade_db()
 st.title("Multitool Chat Assistant")
 
 # Sidebar Menu
-menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "1-Click Search", "Deep Research", "History"]
+menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "1-Click Search", "Deep Research", "AI Only", "History"]
 choice = st.sidebar.selectbox("Choose a Feature", menu)
 
 if choice == "Query Processing":
@@ -495,13 +495,12 @@ if choice == "Query Processing":
     user_query = st.text_input("Enter your query:")
 
     if st.button("Submit Query"):
-        # Check if user query is "hi" or "hellow" separately
         if user_query.strip().lower() in ["hi", "hellow"]:
             headers = {"Authorization": f"Bearer {API_KEY}"}
             payload = {
                 "model": selected_model,
                 "messages": [
-                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "system", "content": "You are a helpful assistant. Please provide responses in a structured format with sections for Introduction, Main Points, and Conclusion."},
                     {"role": "user", "content": user_query}
                 ],
                 "max_tokens": 1500
@@ -512,7 +511,6 @@ if choice == "Query Processing":
             else:
                 result = f"Error in model response: {response_model.text}"
         else:
-            # ...existing code for other queries...
             if 'weather' in user_query.lower():
                 if 'in' in user_query.lower():
                     location = user_query.split('in')[-1].strip()
@@ -521,10 +519,28 @@ if choice == "Query Processing":
                     result = fetch_current_location_weather()
             else:
                 headers = {"Authorization": f"Bearer {API_KEY}"}
+                system_prompt = """You are a helpful assistant. Please structure your responses in the following format:
+
+                🎯 Main Answer:
+                - Provide a direct, concise answer to the query
+                
+                📝 Detailed Explanation:
+                - Break down the topic into key points
+                - Include relevant examples or analogies
+                
+                💡 Additional Insights:
+                - Provide context or related information
+                - Mention any important considerations
+                
+                🔑 Key Takeaways:
+                - List 2-3 main points to remember
+                
+                Please ensure all responses are clear, accurate, and well-organized."""
+
                 payload_model = {
                     "model": selected_model,
                     "messages": [
-                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_query}
                     ],
                     "max_tokens": 1500
@@ -536,7 +552,18 @@ if choice == "Query Processing":
                     model_answer = f"Error in model response: {response_model.text}"
                 
                 web_results = handle_web_search(user_query)
-                analysis_prompt = f"Analyze the following web search results and provide key insights:\n{web_results}"
+                analysis_prompt = f"""Analyze the following web search results and provide insights in this structure:
+
+                📊 Data Analysis:
+                - Key findings from web results
+                - Common themes and patterns
+                
+                🔄 Integration:
+                - Compare with the model's response
+                - Identify any contradictions or confirmations
+                
+                Web Results: {web_results}"""
+
                 payload_analysis = {
                     "model": selected_model,
                     "messages": [
@@ -551,9 +578,18 @@ if choice == "Query Processing":
                 else:
                     web_analysis = f"Error during web analysis: {response_analysis.text}"
                 
-                combine_prompt = (f"Combine the following insights into a single, coherent answer that integrates both perspectives. "
-                                  f"Web analysis: {web_analysis} "
-                                  f"Model suggestion: {model_answer}")
+                combine_prompt = f"""Create a comprehensive response combining these insights:
+
+                Model Analysis: {model_answer}
+                Web Analysis: {web_analysis}
+
+                Structure the final response with:
+                
+                📌 Executive Summary
+                📊 Detailed Analysis
+                💡 Key Insights
+                ✅ Final Recommendations"""
+
                 payload_combine = {
                     "model": selected_model,
                     "messages": [
@@ -567,8 +603,9 @@ if choice == "Query Processing":
                     result = response_combine.json()['choices'][0]['message']['content']
                 else:
                     result = f"Error during final combination: {response_combine.text}"
+
         result = re.sub(r'[#\$%\^]+', '', result)
-        st.write(result)
+        st.markdown(result)
         add_history("Query Processing", user_query, result)
 
 elif choice == "Weather Information":
@@ -712,64 +749,193 @@ elif choice == "Deep Research":
             if 'error' in results:
                 st.error(results['error'])
             else:
-                # Display ArXiv results
-                st.subheader("ArXiv Papers")
-                for paper in results['arxiv']:
-                    st.markdown(paper, unsafe_allow_html=True)
+                # Create tabs for different sources
+                tabs = st.tabs(["📚 ArXiv Papers", "📱 Medium Articles", "📝 WordPress Posts", "🔍 Research Summary"])
+                
+                # ArXiv Papers Tab
+                with tabs[0]:
+                    st.markdown("""
+                    <style>
+                    .paper-container {
+                        border: 1px solid #e0e0e0;
+                        border-radius: 5px;
+                        padding: 15px;
+                        margin: 10px 0;
+                        background-color: #f9f9f9;
+                        color: #000000;
+                    }
+                    .paper-container h3 {
+                        color: #000000 !important;
+                    }
+                    .paper-container p {
+                        color: #000000 !important;
+                    }
+                    .paper-container strong {
+                        color: #000000 !important;
+                    }
+                    .paper-container a {
+                        color: #0066cc !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
                     
-                # Display Medium results
-                st.subheader("Medium Articles")
-                for article in results['medium']:
-                    st.markdown(article, unsafe_allow_html=True)
+                    st.markdown("<h2 style='color: #ffffff;'>📚 Academic Research Papers</h2>", unsafe_allow_html=True)
+                    for paper in results['arxiv']:
+                        st.markdown(f'<div class="paper-container">{paper}</div>', unsafe_allow_html=True)
                 
-                # Display WordPress results
-                st.subheader("WordPress Articles")
-                for post in results['wordpress']:
-                    st.markdown(post, unsafe_allow_html=True)
+                # Medium Articles Tab
+                with tabs[1]:
+                    st.subheader("📱 Medium Articles")
+                    for article in results['medium']:
+                        st.markdown(article, unsafe_allow_html=True)
                 
-                # AI Analysis of papers with improved error handling
-                with st.spinner("Generating research summary..."):
-                    summary_prompt = f"Analyze and summarize the key findings from the research papers about: {search_query}"
-                    payload = {
-                        "model": selected_model,
-                        "messages": [
-                            {"role": "system", "content": "You are a research assistant providing comprehensive analysis."},
-                            {"role": "user", "content": summary_prompt}
-                        ],
-                        "max_tokens": 1000
-                    }
-                    headers = {
-                        "Authorization": f"Bearer {API_KEY}"
-                    }
-                    try:
-                        response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
-                        response_data = response.json()
+                # WordPress Tab
+                with tabs[2]:
+                    st.subheader("📝 WordPress Content")
+                    for post in results['wordpress']:
+                        st.markdown(post, unsafe_allow_html=True)
+                
+                # Research Summary Tab
+                with tabs[3]:
+                    with st.spinner("Generating comprehensive research summary..."):
+                        summary_prompt = f"""Analyze the research papers and articles about: {search_query}
                         
-                        if response.status_code == 200 and 'choices' in response_data:
-                            if response_data['choices'] and len(response_data['choices']) > 0:
-                                if 'message' in response_data['choices'][0]:
-                                    summary = response_data['choices'][0]['message'].get('content', 'No summary generated.')
-                                    st.subheader("Research Summary")
-                                    st.write(summary)
-                                else:
-                                    st.error("Error: Unexpected API response format - missing message content")
+                        Please provide a structured analysis following this format:
+                        
+                        🎯 Research Focus:
+                        - Main topic and scope
+                        - Key research questions
+                        
+                        📊 Key Findings:
+                        - Major discoveries
+                        - Statistical significance
+                        - Research outcomes
+                        
+                        🔬 Methodologies:
+                        - Research approaches
+                        - Data collection methods
+                        - Analysis techniques
+                        
+                        💡 Insights:
+                        - Main implications
+                        - Practical applications
+                        - Future research directions
+                        
+                        📌 Critical Analysis:
+                        - Strengths and limitations
+                        - Gaps in research
+                        - Contradicting findings
+                        
+                        ✅ Conclusions:
+                        - Summary of findings
+                        - Recommendations
+                        - Future perspectives
+                        """
+                        
+                        payload = {
+                            "model": selected_model,
+                            "messages": [
+                                {
+                                    "role": "system", 
+                                    "content": "You are a research analyst providing comprehensive analysis in a clear, structured format."
+                                },
+                                {"role": "user", "content": summary_prompt}
+                            ],
+                            "max_tokens": 2000
+                        }
+                        headers = {
+                            "Authorization": f"Bearer {API_KEY}"
+                        }
+                        
+                        try:
+                            response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                            response_data = response.json()
+                            
+                            if response.status_code == 200 and 'choices' in response_data:
+                                if response_data['choices'] and len(response_data['choices']) > 0:
+                                    if 'message' in response_data['choices'][0]:
+                                        summary = response_data['choices'][0]['message'].get('content', 'No summary generated.')
+                                        
+                                        # Display summary in expandable sections
+                                        sections = summary.split('\n\n')
+                                        for section in sections:
+                                            if section.strip():
+                                                # Extract section title if it exists
+                                                if ':' in section.split('\n')[0]:
+                                                    title = section.split('\n')[0]
+                                                    content = '\n'.join(section.split('\n')[1:])
+                                                    with st.expander(title):
+                                                        st.markdown(content)
+                                                else:
+                                                    st.markdown(section)
+                                    else:
+                                        st.error("Error: Unexpected API response format - missing message content")
                             else:
-                                st.error("Error: No choices returned from API")
-                        else:
-                            error_message = response_data.get('error', {}).get('message', 'Unknown error occurred')
-                            st.error(f"API Error: {error_message}")
-                    
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"Network error occurred: {str(e)}")
-                    except ValueError as e:
-                        st.error(f"Error parsing API response: {str(e)}")
-                    except Exception as e:
-                        st.error(f"An unexpected error occurred: {str(e)}")
+                                error_message = response_data.get('error', {}).get('message', 'Unknown error occurred')
+                                st.error(f"API Error: {error_message}")
+                        
+                        except Exception as e:
+                            st.error(f"An error occurred during analysis: {str(e)}")
+                
+                # Add download button for full report
+                full_report = f"""
+                # Research Report: {search_query}
+                
+                ## ArXiv Papers
+                {len(results['arxiv'])} papers found
+                
+                ## Medium Articles
+                {len(results['medium'])} articles found
+                
+                ## WordPress Posts
+                {len(results['wordpress'])} posts found
+                
+                ## Analysis Summary
+                {summary if 'summary' in locals() else 'Analysis not available'}
+                """
+                
+                st.download_button(
+                    label="📥 Download Full Report",
+                    data=full_report,
+                    file_name="research_report.txt",
+                    mime="text/plain"
+                )
                 
                 add_history("Deep Research", search_query, 
-                          f"Found {len(results['arxiv'])} ArXiv papers, "
-                          f"{len(results['medium'])} Medium articles, and "
-                          f"{len(results['wordpress'])} WordPress posts")
+                          f"Research Report Generated | ArXiv: {len(results['arxiv'])} papers, "
+                          f"Medium: {len(results['medium'])} articles, "
+                          f"WordPress: {len(results['wordpress'])} posts")
+
+elif choice == "AI Only":
+    st.subheader("AI Only Responses")
+    user_query = st.text_input("Enter your question:")
+    
+    if st.button("Get AI Response"):
+        with st.spinner("Generating AI response..."):
+            try:
+                headers = {"Authorization": f"Bearer {API_KEY}"}
+                payload = {
+                    "model": selected_model,
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful and knowledgeable assistant. Provide detailed and accurate responses."},
+                        {"role": "user", "content": user_query}
+                    ],
+                    "max_tokens": 2000,
+                    "temperature": 0.7
+                }
+                
+                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                
+                if response.status_code == 200:
+                    result = response.json()['choices'][0]['message']['content']
+                    st.markdown("### AI Response:")
+                    st.write(result)
+                    add_history("AI Only", user_query, result)
+                else:
+                    st.error(f"Error: {response.json().get('error', {}).get('message', 'Unknown error occurred')}")
+                
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
 
 elif choice == "History":
     st.subheader("History")
