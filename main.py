@@ -14,6 +14,8 @@ import arxiv
 import sys
 import time
 from fake_useragent import UserAgent
+from langdetect import detect  # new import for language detection
+import re  # ensure regex is imported
 
 # API Configuration
 API_BASE_URL = "https://openrouter.ai/api/v1"
@@ -169,12 +171,13 @@ def search_duckduckgo(query, max_results=10):
         # Initialize DDGS without the 'proxies' parameter.
         with DDGS() as ddgs:
             for idx, result in enumerate(ddgs.text(query, max_results=max_results, region="in-en"), start=1):
-                logo_url = f"https://logo.clearbit.com/{result['href'].split('/')[2]}"
                 domain = result['href'].split('/')[2].replace('www.', '')
-                if 'wikipedia.org' in domain:
-                    company_name = 'Wikipedia'
+                # Use fallback logo for the specific domain
+                if domain == "blog.google":
+                    logo_url = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png"
                 else:
-                    company_name = domain.split('.')[0]
+                    logo_url = f"https://logo.clearbit.com/{domain}"
+                company_name = 'Wikipedia' if 'wikipedia.org' in domain else domain.split('.')[0]
                 result_entry = (
                     f"<div style='margin-bottom: 20px;'>"
                     f"<img src='{logo_url}' alt='Company Logo' style='width: 50px; height: 50px; vertical-align: middle; margin-right: 10px;'>"
@@ -230,8 +233,6 @@ def summarize_image(image_path, query):
             result = response.json()
             if 'choices' in result:
                 description = result['choices'][0]['message']['content']
-                # Remove technical details from the description
-                description = description.split("9j/")[0]
                 return description
             else:
                 return "Error: 'choices' not found in the response."
@@ -261,37 +262,38 @@ def handle_web_search(query):
     results = search_duckduckgo(query)
     return "\n".join(results)
 
-# Function to search YouTube videos
-def search_youtube(query, max_results=5):
+def search_youtube(query, max_results=10):  # updated default max_results
     try:
-        # Initialize the YouTube API client
         youtube = googleapiclient.discovery.build(
             "youtube", "v3", 
-            developerKey="AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk"  # Use hardcoded API key
+            developerKey="AIzaSyCdLr1l8bbi_u6EiM4pwRzuIjk3ztx3xVk"
         )
-
-        # Execute search request
         request = youtube.search().list(
             part="snippet",
             q=query,
             type="video",
-            maxResults=max_results
+            maxResults=max_results,
+            order="relevance"  # new parameter for top results
         )
         response = request.execute()
 
         results = []
         for item in response.get('items', []):
-            video_id = item['id']['videoId']
             title = item['snippet']['title']
-            description = item['snippet']['description']
-            thumbnail = item['snippet']['thumbnails']['medium']['url']
-            
+            if "reel" in title.lower():
+                continue
+            try:
+                lang = detect(title)
+            except Exception:
+                lang = "en"
+            if lang not in ['en', 'hi']:
+                continue
+            video_id = item['id']['videoId']
             result_entry = (
                 f"<div style='margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>"
-                f"<img src='{thumbnail}' style='width: 320px; height: 180px;'><br>"
+                f"<iframe width='320' height='180' src='https://www.youtube.com/embed/{video_id}' frameborder='0' allowfullscreen></iframe><br>"
                 f"<a href='https://www.youtube.com/watch?v={video_id}' target='_blank'>"
                 f"<h3>{title}</h3></a>"
-                f"<p>{description}</p>"
                 f"</div>"
             )
             results.append(result_entry)
@@ -299,7 +301,6 @@ def search_youtube(query, max_results=5):
     except Exception as e:
         return [f"An error occurred: {str(e)}"]
 
-# Function to perform combined search
 def perform_combined_search(query):
     results = {
         'web': [],
@@ -307,11 +308,11 @@ def perform_combined_search(query):
         'youtube': []
     }
     
-    # Web Search
-    web_results = search_duckduckgo(query, max_results=5)
+    # Web Search with 10 results
+    web_results = search_duckduckgo(query, max_results=10)  # updated max_results
     results['web'] = web_results
 
-    # AI Model Response
+    # AI Model Response remains unchanged
     payload = {
         "model": selected_model,
         "messages": [
@@ -332,8 +333,8 @@ def perform_combined_search(query):
     except Exception as e:
         results['ai'] = f"AI Error: {str(e)}"
 
-    # YouTube Search
-    youtube_results = search_youtube(query)
+    # YouTube Search with 10 results
+    youtube_results = search_youtube(query, max_results=10)  # updated max_results
     results['youtube'] = youtube_results
 
     return results
@@ -494,34 +495,79 @@ if choice == "Query Processing":
     user_query = st.text_input("Enter your query:")
 
     if st.button("Submit Query"):
-        if 'weather' in user_query.lower():
-            if 'in' in user_query.lower():
-                location = user_query.split('in')[-1].strip()
-                result = fetch_specified_location_weather(location)
-            else:
-                result = fetch_current_location_weather()
-        else:
+        # Check if user query is "hi" or "hellow" separately
+        if user_query.strip().lower() in ["hi", "hellow"]:
+            headers = {"Authorization": f"Bearer {API_KEY}"}
             payload = {
                 "model": selected_model,
                 "messages": [
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": user_query}
                 ],
-                "max_tokens": 4000  # Add missing max_tokens value
+                "max_tokens": 1500
             }
-            headers = {
-                "Authorization": f"Bearer {API_KEY}"
-            }
-            response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
-            if response.status_code == 200:
-                result_data = response.json()
-                if 'choices' in result_data:
-                    result = result_data['choices'][0]['message']['content']
-                else:
-                    result = "Error: 'choices' not found in the response."
+            response_model = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+            if response_model.status_code == 200 and 'choices' in response_model.json():
+                result = response_model.json()['choices'][0]['message']['content']
             else:
-                result = f"Error in query processing: {response.text}"
-
+                result = f"Error in model response: {response_model.text}"
+        else:
+            # ...existing code for other queries...
+            if 'weather' in user_query.lower():
+                if 'in' in user_query.lower():
+                    location = user_query.split('in')[-1].strip()
+                    result = fetch_specified_location_weather(location)
+                else:
+                    result = fetch_current_location_weather()
+            else:
+                headers = {"Authorization": f"Bearer {API_KEY}"}
+                payload_model = {
+                    "model": selected_model,
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": user_query}
+                    ],
+                    "max_tokens": 1500
+                }
+                response_model = requests.post(f"{API_BASE_URL}/chat/completions", json=payload_model, headers=headers)
+                if response_model.status_code == 200 and 'choices' in response_model.json():
+                    model_answer = response_model.json()['choices'][0]['message']['content']
+                else:
+                    model_answer = f"Error in model response: {response_model.text}"
+                
+                web_results = handle_web_search(user_query)
+                analysis_prompt = f"Analyze the following web search results and provide key insights:\n{web_results}"
+                payload_analysis = {
+                    "model": selected_model,
+                    "messages": [
+                        {"role": "system", "content": "You are an assistant analyzing search results."},
+                        {"role": "user", "content": analysis_prompt}
+                    ],
+                    "max_tokens": 1500
+                }
+                response_analysis = requests.post(f"{API_BASE_URL}/chat/completions", json=payload_analysis, headers=headers)
+                if response_analysis.status_code == 200 and 'choices' in response_analysis.json():
+                    web_analysis = response_analysis.json()['choices'][0]['message']['content']
+                else:
+                    web_analysis = f"Error during web analysis: {response_analysis.text}"
+                
+                combine_prompt = (f"Combine the following insights into a single, coherent answer that integrates both perspectives. "
+                                  f"Web analysis: {web_analysis} "
+                                  f"Model suggestion: {model_answer}")
+                payload_combine = {
+                    "model": selected_model,
+                    "messages": [
+                        {"role": "system", "content": "You are an assistant skilled at synthesizing information."},
+                        {"role": "user", "content": combine_prompt}
+                    ],
+                    "max_tokens": 1500
+                }
+                response_combine = requests.post(f"{API_BASE_URL}/chat/completions", json=payload_combine, headers=headers)
+                if response_combine.status_code == 200 and 'choices' in response_combine.json():
+                    result = response_combine.json()['choices'][0]['message']['content']
+                else:
+                    result = f"Error during final combination: {response_combine.text}"
+        result = re.sub(r'[#\$%\^]+', '', result)
         st.write(result)
         add_history("Query Processing", user_query, result)
 
@@ -561,43 +607,29 @@ elif choice == "Image Search":
 elif choice == "Picture Explanation":
     st.subheader("Picture Explanation")
     uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-
     if uploaded_image is not None:
+        os.makedirs("temp_data", exist_ok=True)
         image_path = os.path.join("temp_data", uploaded_image.name)
         with open(image_path, "wb") as file:
             file.write(uploaded_image.read())
-        
-        # Create two columns
-        col1, col2 = st.columns(2)
-        
-        # Display the uploaded image on the left
-        with col1:
-            st.image(image_path)
-        
-        # Display the summarized output on the right
-        with col2:
-            query = st.text_input("Enter your query about the image:")
-            if st.button("Generate Text"):
+        query = st.text_input("Enter your query about the image:")
+        if st.button("Generate Text"):
+            try:
                 summary = summarize_image(image_path, query)
-                if "Error" in summary:
-                    st.error(summary)
-                else:
-                    st.write(summary)
-                add_history("Picture Explanation", uploaded_image.name, summary)
+            except Exception as e:
+                summary = f"Error during image summarization: {e}"
+            st.write(summary)
+            add_history("Picture Explanation", uploaded_image.name, summary)
 
 elif choice == "PDF Summarization":
     st.subheader("PDF Summarization")
     uploaded_file = st.file_uploader("Upload a PDF file", type="pdf")
-
     if uploaded_file is not None:
-        # Save uploaded file temporarily
         temp_dir = "temp_data"
         os.makedirs(temp_dir, exist_ok=True)
         filepath = os.path.join(temp_dir, uploaded_file.name)
         with open(filepath, "wb") as temp_file:
             temp_file.write(uploaded_file.read())
-
-        # Check file size and compress if necessary
         if os.path.getsize(filepath) > 10 * 1024 * 1024:  # 10MB
             compressed_filepath = os.path.join(temp_dir, f"compressed_{uploaded_file.name}")
             compress_result = compress_pdf(filepath, compressed_filepath)
@@ -606,33 +638,12 @@ elif choice == "PDF Summarization":
                 filepath = None
             else:
                 filepath = compressed_filepath
-
         if filepath:
-            # Create two columns
-            col1, col2 = st.columns(2)
-
-            # Display the PDF on the left
-            with col1:
-                st.info("Uploaded File")
-                display_pdf(filepath)
-
-            # Query and answer section on the right
-            with col2:
-                st.info("Enter your query(s) about the document:")
-                queries = st.text_area("Your Queries", placeholder="Enter each query separated by new lines...")
-
-                if st.button("Submit Queries"):
-                    queries_list = queries.strip().split("\n")
-                    answers = []
-                    st.subheader("Summarized Answers")
-
-                    # Process each query one by one
-                    for i, query in enumerate(queries_list, start=0):
-                        with st.spinner(f"Processing query {i}: {query}..."):
-                            summary = llm_pipeline(filepath, query)
-                            st.markdown(f"**{i}.** {summary}")
-                            answers.append(summary)
-                    add_history("PDF Summarization", queries_list, answers)
+            query = st.text_input("Enter your query about the document:")
+            if st.button("Submit Query"):
+                summary = llm_pipeline(filepath, query)
+                st.write(summary)
+                add_history("PDF Summarization", query, summary)
 
 elif choice == "Web Search":
     st.subheader("Web Search")
@@ -654,10 +665,6 @@ elif choice == "1-Click Search":
         with st.spinner("Searching across multiple platforms..."):
             results = perform_combined_search(search_query)
             
-            # Display AI Response
-            st.subheader("AI Response")
-            st.write(results['ai'])
-            
             # Display Web Results
             st.subheader("Web Results")
             st.markdown("\n".join(results['web']), unsafe_allow_html=True)
@@ -666,11 +673,32 @@ elif choice == "1-Click Search":
             st.subheader("YouTube Results")
             st.markdown("\n".join(results['youtube']), unsafe_allow_html=True)
             
-            # Add to history
+            # Combined analysis of web and YouTube results using the AI model
+            web_text = " ".join(results['web'])
+            youtube_text = " ".join(results['youtube'])
+            analysis_prompt = f"Analyze the following web search and YouTube video results and provide a comprehensive, concise answer in English: Web: {web_text} YouTube: {youtube_text}"
+            payload_analysis = {
+                "model": selected_model,
+                "messages": [
+                    {"role": "system", "content": "You are an assistant analyzing search results."},
+                    {"role": "user", "content": analysis_prompt}
+                ],
+                "max_tokens": 1000
+            }
+            headers = {
+                "Authorization": f"Bearer {API_KEY}"
+            }
+            response_analysis = requests.post(f"{API_BASE_URL}/chat/completions", json=payload_analysis, headers=headers)
+            if response_analysis.status_code == 200:
+                analysis_result = response_analysis.json()['choices'][0]['message']['content']
+            else:
+                analysis_result = "Error in combined analysis."
+            st.subheader("Analyzed Combined Result")
+            st.write(analysis_result)
+            
+            # Add to history with analysis summary snippet
             add_history("1-Click Search", search_query, 
-                       f"AI Response: {results['ai'][:100]}...\n" +
-                       f"Web Results: {len(results['web'])} items\n" +
-                       f"YouTube Results: {len(results['youtube'])} items")
+                f"Web: {len(results['web'])} items | YouTube: {len(results['youtube'])} items | Analysis: {analysis_result[:100]}...")
 
 elif choice == "Deep Research":
     st.subheader("Deep Research")
