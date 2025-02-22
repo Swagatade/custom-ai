@@ -1,5 +1,5 @@
 streamlit==1.37.0
-requests==2.31.0
+requests==2.32.2
 duckduckgo-search==3.9.9
 PyPDF2==3.0.1
 Pillow==10.3.0
