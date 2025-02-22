@@ -10,6 +10,10 @@ import io
 import sqlite3
 from datetime import datetime
 import googleapiclient.discovery
+import arxiv
+import sys
+import time
+from fake_useragent import UserAgent
 
 # API Configuration
 API_BASE_URL = "https://openrouter.ai/api/v1"
@@ -393,6 +397,87 @@ def delete_history_entry(entry_id):
     conn.commit()
     conn.close()
 
+def search_research_papers(query, max_results=5):
+    try:
+        # ArXiv search using new Client method
+        client = arxiv.Client()
+        search = arxiv.Search(
+            query=query,
+            max_results=max_results,
+            sort_by=arxiv.SortCriterion.Relevance
+        )
+        arxiv_results = []
+        for paper in client.results(search):
+            # Convert Author objects to strings properly
+            author_names = [str(author.name) if hasattr(author, 'name') else str(author) for author in paper.authors]
+            
+            result_entry = (
+                f"<div style='margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>"
+                f"<h3>{paper.title}</h3>"
+                f"<p><strong>Authors:</strong> {', '.join(author_names)}</p>"
+                f"<p><strong>Published:</strong> {paper.published}</p>"
+                f"<p>{paper.summary[:300]}...</p>"
+                f"<a href='{paper.pdf_url}' target='_blank'>Download PDF</a> | "
+                f"<a href='{paper.entry_id}' target='_blank'>View on ArXiv</a>"
+                f"</div>"
+            )
+            arxiv_results.append(result_entry)
+
+        # Add Medium search
+        medium_results = []
+        try:
+            medium_url = f"https://api.medium.com/v1/search?q={requests.utils.quote(query)}"
+            medium_response = requests.get(
+                f"https://medium.com/search?q={requests.utils.quote(query)}",
+                headers={'User-Agent': UserAgent().random}
+            )
+            
+            if medium_response.status_code == 200:
+                # Parse Medium articles from response
+                for i in range(max_results):
+                    try:
+                        result_entry = (
+                            f"<div style='margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>"
+                            f"<h3>Medium Article</h3>"
+                            f"<a href='https://medium.com/search?q={requests.utils.quote(query)}' target='_blank'>"
+                            f"View Medium Articles about {query}</a>"
+                            f"</div>"
+                        )
+                        medium_results.append(result_entry)
+                        break
+                    except Exception as e:
+                        st.warning(f"Warning: Could not process Medium result: {str(e)}")
+                        continue
+        except Exception as medium_error:
+            st.info("Medium search results may be limited.")
+
+        # Add WordPress search
+        wordpress_results = []
+        try:
+            # Search WordPress.com public posts
+            wp_url = f"https://public-api.wordpress.com/rest/v1.1/read/search?q={requests.utils.quote(query)}&number={max_results}"
+            wp_response = requests.get(wp_url)
+            
+            if wp_response.status_code == 200:
+                result_entry = (
+                    f"<div style='margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;'>"
+                    f"<h3>WordPress Articles</h3>"
+                    f"<a href='https://wordpress.com/read/search?q={requests.utils.quote(query)}' target='_blank'>"
+                    f"View WordPress Articles about {query}</a>"
+                    f"</div>"
+                )
+                wordpress_results.append(result_entry)
+        except Exception as wp_error:
+            st.info("WordPress search results may be limited.")
+
+        return {
+            'arxiv': arxiv_results,
+            'medium': medium_results,
+            'wordpress': wordpress_results
+        }
+    except Exception as e:
+        return {'error': f"An error occurred: {str(e)}"}
+
 # Initialize DB on startup
 init_db()
 upgrade_db()
@@ -401,7 +486,7 @@ upgrade_db()
 st.title("Multitool Chat Assistant")
 
 # Sidebar Menu
-menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "1-Click Search", "History"]
+menu = ["Query Processing", "Weather Information", "PDF Summarization", "Image Search", "Picture Explanation", "Web Search", "1-Click Search", "Deep Research", "History"]
 choice = st.sidebar.selectbox("Choose a Feature", menu)
 
 if choice == "Query Processing":
@@ -586,6 +671,77 @@ elif choice == "1-Click Search":
                        f"AI Response: {results['ai'][:100]}...\n" +
                        f"Web Results: {len(results['web'])} items\n" +
                        f"YouTube Results: {len(results['youtube'])} items")
+
+elif choice == "Deep Research":
+    st.subheader("Deep Research")
+    
+    search_query = st.text_input("Enter your research query:")
+    
+    if st.button("Search and Analyze"):
+        with st.spinner("Searching papers and articles..."):
+            results = search_research_papers(search_query)
+            
+            if 'error' in results:
+                st.error(results['error'])
+            else:
+                # Display ArXiv results
+                st.subheader("ArXiv Papers")
+                for paper in results['arxiv']:
+                    st.markdown(paper, unsafe_allow_html=True)
+                    
+                # Display Medium results
+                st.subheader("Medium Articles")
+                for article in results['medium']:
+                    st.markdown(article, unsafe_allow_html=True)
+                
+                # Display WordPress results
+                st.subheader("WordPress Articles")
+                for post in results['wordpress']:
+                    st.markdown(post, unsafe_allow_html=True)
+                
+                # AI Analysis of papers with improved error handling
+                with st.spinner("Generating research summary..."):
+                    summary_prompt = f"Analyze and summarize the key findings from the research papers about: {search_query}"
+                    payload = {
+                        "model": selected_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a research assistant providing comprehensive analysis."},
+                            {"role": "user", "content": summary_prompt}
+                        ],
+                        "max_tokens": 1000
+                    }
+                    headers = {
+                        "Authorization": f"Bearer {API_KEY}"
+                    }
+                    try:
+                        response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                        response_data = response.json()
+                        
+                        if response.status_code == 200 and 'choices' in response_data:
+                            if response_data['choices'] and len(response_data['choices']) > 0:
+                                if 'message' in response_data['choices'][0]:
+                                    summary = response_data['choices'][0]['message'].get('content', 'No summary generated.')
+                                    st.subheader("Research Summary")
+                                    st.write(summary)
+                                else:
+                                    st.error("Error: Unexpected API response format - missing message content")
+                            else:
+                                st.error("Error: No choices returned from API")
+                        else:
+                            error_message = response_data.get('error', {}).get('message', 'Unknown error occurred')
+                            st.error(f"API Error: {error_message}")
+                    
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Network error occurred: {str(e)}")
+                    except ValueError as e:
+                        st.error(f"Error parsing API response: {str(e)}")
+                    except Exception as e:
+                        st.error(f"An unexpected error occurred: {str(e)}")
+                
+                add_history("Deep Research", search_query, 
+                          f"Found {len(results['arxiv'])} ArXiv papers, "
+                          f"{len(results['medium'])} Medium articles, and "
+                          f"{len(results['wordpress'])} WordPress posts")
 
 elif choice == "History":
     st.subheader("History")
