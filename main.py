@@ -543,7 +543,7 @@ if choice == "Query Processing":
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_query}
                     ],
-                    "max_tokens": 1500
+                    "max_tokens": 2000
                 }
                 response_model = requests.post(f"{API_BASE_URL}/chat/completions", json=payload_model, headers=headers)
                 if response_model.status_code == 200 and 'choices' in response_model.json():
@@ -740,171 +740,391 @@ elif choice == "1-Click Search":
 elif choice == "Deep Research":
     st.subheader("Deep Research")
     
+    # Add research mode selection
+    research_mode = st.radio("Select Research Mode", ["Quick Research", "Deep Research"])
     search_query = st.text_input("Enter your research query:")
     
     if st.button("Search and Analyze"):
-        with st.spinner("Searching papers and articles..."):
-            results = search_research_papers(search_query)
+        with st.spinner("Searching and analyzing..."):
+            # Get research papers and web results
+            paper_results = search_research_papers(search_query)
+            web_results = handle_web_search(search_query)
             
-            if 'error' in results:
-                st.error(results['error'])
-            else:
-                # Create tabs for different sources
-                tabs = st.tabs(["📚 ArXiv Papers", "📱 Medium Articles", "📝 WordPress Posts", "🔍 Research Summary"])
+            if research_mode == "Quick Research":
+                # Quick Research Mode
+                tabs = st.tabs(["📚 Research Summary", "🌐 Web Analysis", "🤖 AI Insights"])
                 
-                # ArXiv Papers Tab
                 with tabs[0]:
-                    st.markdown("""
-                    <style>
-                    .paper-container {
-                        border: 1px solid #e0e0e0;
-                        border-radius: 5px;
-                        padding: 15px;
-                        margin: 10px 0;
-                        background-color: #f9f9f9;
-                        color: #000000;
-                    }
-                    .paper-container h3 {
-                        color: #000000 !important;
-                    }
-                    .paper-container p {
-                        color: #000000 !important;
-                    }
-                    .paper-container strong {
-                        color: #000000 !important;
-                    }
-                    .paper-container a {
-                        color: #0066cc !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
+                    st.subheader("Research Overview")
+                    # Analyze papers quickly
+                    quick_analysis_prompt = f"""Analyze these research papers and provide a quick summary:
+                    Papers: {str(paper_results)}
                     
-                    st.markdown("<h2 style='color: #ffffff;'>📚 Academic Research Papers</h2>", unsafe_allow_html=True)
-                    for paper in results['arxiv']:
-                        st.markdown(f'<div class="paper-container">{paper}</div>', unsafe_allow_html=True)
+                    Provide:
+                    1. Key Findings (3-5 bullet points)
+                    2. Main Trends
+                    3. Quick Takeaways"""
+                    
+                    headers = {"Authorization": f"Bearer {API_KEY}"}
+                    payload = {
+                        "model": selected_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a research analyst providing quick insights."},
+                            {"role": "user", "content": quick_analysis_prompt}
+                        ],
+                        "max_tokens": 1000
+                    }
+                    
+                    response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                    if response.status_code == 200:
+                        quick_summary = response.json()['choices'][0]['message']['content']
+                        st.markdown(quick_summary)
                 
-                # Medium Articles Tab
                 with tabs[1]:
-                    st.subheader("📱 Medium Articles")
-                    for article in results['medium']:
-                        st.markdown(article, unsafe_allow_html=True)
+                    st.subheader("Web Content Analysis")
+                    # Analyze web results
+                    web_analysis_prompt = f"""Analyze these web search results and extract key insights:
+                    Content: {web_results}
+                    
+                    Provide:
+                    1. Main Topics Discussed
+                    2. Common Themes
+                    3. Contradictions (if any)"""
+                    
+                    payload["messages"][1]["content"] = web_analysis_prompt
+                    response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                    if response.status_code == 200:
+                        web_analysis = response.json()['choices'][0]['message']['content']
+                        st.markdown(web_analysis)
                 
-                # WordPress Tab
                 with tabs[2]:
-                    st.subheader("📝 WordPress Content")
-                    for post in results['wordpress']:
-                        st.markdown(post, unsafe_allow_html=True)
+                    st.subheader("AI Model Insights")
+                    # Get AI model's perspective
+                    ai_analysis_prompt = f"""Analyze this topic as an AI model:
+                    Topic: {search_query}
+                    
+                    Provide:
+                    1. Current State of Research
+                    2. Future Implications
+                    3. Potential Research Gaps"""
+                    
+                    payload["messages"][1]["content"] = ai_analysis_prompt
+                    response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                    if response.status_code == 200:
+                        ai_insights = response.json()['choices'][0]['message']['content']
+                        st.markdown(ai_insights)
                 
-                # Research Summary Tab
-                with tabs[3]:
-                    with st.spinner("Generating comprehensive research summary..."):
-                        summary_prompt = f"""Analyze the research papers and articles about: {search_query}
-                        
-                        Please provide a structured analysis following this format:
-                        
-                        🎯 Research Focus:
-                        - Main topic and scope
-                        - Key research questions
-                        
-                        📊 Key Findings:
-                        - Major discoveries
-                        - Statistical significance
-                        - Research outcomes
-                        
-                        🔬 Methodologies:
-                        - Research approaches
-                        - Data collection methods
-                        - Analysis techniques
-                        
-                        💡 Insights:
-                        - Main implications
-                        - Practical applications
-                        - Future research directions
-                        
-                        📌 Critical Analysis:
-                        - Strengths and limitations
-                        - Gaps in research
-                        - Contradicting findings
-                        
-                        ✅ Conclusions:
-                        - Summary of findings
-                        - Recommendations
-                        - Future perspectives
-                        """
-                        
-                        payload = {
-                            "model": selected_model,
-                            "messages": [
-                                {
-                                    "role": "system", 
-                                    "content": "You are a research analyst providing comprehensive analysis in a clear, structured format."
-                                },
-                                {"role": "user", "content": summary_prompt}
-                            ],
-                            "max_tokens": 2000
-                        }
-                        headers = {
-                            "Authorization": f"Bearer {API_KEY}"
-                        }
-                        
-                        try:
-                            response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
-                            response_data = response.json()
-                            
-                            if response.status_code == 200 and 'choices' in response_data:
-                                if response_data['choices'] and len(response_data['choices']) > 0:
-                                    if 'message' in response_data['choices'][0]:
-                                        summary = response_data['choices'][0]['message'].get('content', 'No summary generated.')
-                                        
-                                        # Display summary in expandable sections
-                                        sections = summary.split('\n\n')
-                                        for section in sections:
-                                            if section.strip():
-                                                # Extract section title if it exists
-                                                if ':' in section.split('\n')[0]:
-                                                    title = section.split('\n')[0]
-                                                    content = '\n'.join(section.split('\n')[1:])
-                                                    with st.expander(title):
-                                                        st.markdown(content)
-                                                else:
-                                                    st.markdown(section)
-                                    else:
-                                        st.error("Error: Unexpected API response format - missing message content")
-                            else:
-                                error_message = response_data.get('error', {}).get('message', 'Unknown error occurred')
-                                st.error(f"API Error: {error_message}")
-                        
-                        except Exception as e:
-                            st.error(f"An error occurred during analysis: {str(e)}")
+                # Quick download option
+                quick_report = f"""
+                # Quick Research Report: {search_query}
                 
-                # Add download button for full report
-                full_report = f"""
-                # Research Report: {search_query}
+                ## Research Summary
+                {quick_summary}
                 
-                ## ArXiv Papers
-                {len(results['arxiv'])} papers found
+                ## Web Analysis
+                {web_analysis}
                 
-                ## Medium Articles
-                {len(results['medium'])} articles found
-                
-                ## WordPress Posts
-                {len(results['wordpress'])} posts found
-                
-                ## Analysis Summary
-                {summary if 'summary' in locals() else 'Analysis not available'}
+                ## AI Insights
+                {ai_insights}
                 """
                 
                 st.download_button(
-                    label="📥 Download Full Report",
-                    data=full_report,
-                    file_name="research_report.txt",
+                    label="📥 Download Quick Report",
+                    data=quick_report,
+                    file_name="quick_research_report.txt",
                     mime="text/plain"
                 )
                 
-                add_history("Deep Research", search_query, 
-                          f"Research Report Generated | ArXiv: {len(results['arxiv'])} papers, "
-                          f"Medium: {len(results['medium'])} articles, "
-                          f"WordPress: {len(results['wordpress'])} posts")
+                add_history("Quick Research", search_query, 
+                          f"Quick Research Report Generated | Papers analyzed: {len(paper_results.get('arxiv', []))}")
+            
+            else:
+                # Original Deep Research Mode
+                with st.spinner("Searching papers and articles..."):
+                    results = search_research_papers(search_query)
+                    
+                    if 'error' in results:
+                        st.error(results['error'])
+                    else:
+                        # Create tabs for different sources
+                        tabs = st.tabs(["📚 ArXiv Papers", "📱 Medium Articles", "📝 WordPress Posts", "🔍 Research Summary"])
+                        
+                        # ArXiv Papers Tab
+                        with tabs[0]:
+                            st.markdown("""
+                            <style>
+                            .paper-container {
+                                border: 1px solid #e0e0e0;
+                                border-radius: 5px;
+                                padding: 15px;
+                                margin: 10px 0;
+                                background-color: #f9f9f9;
+                                color: #000000;
+                            }
+                            .paper-container h3 {
+                                color: #000000 !important;
+                            }
+                            .paper-container p {
+                                color: #000000 !important;
+                            }
+                            .paper-container strong {
+                                color: #000000 !important;
+                            }
+                            .paper-container a {
+                                color: #0066cc !important;
+                            }
+                            </style>
+                            """, unsafe_allow_html=True)
+                            
+                            st.markdown("<h2 style='color: #ffffff;'>📚 Academic Research Papers</h2>", unsafe_allow_html=True)
+                            for paper in results['arxiv']:
+                                st.markdown(f'<div class="paper-container">{paper}</div>', unsafe_allow_html=True)
+                        
+                        # Medium Articles Tab
+                        with tabs[1]:
+                            st.subheader("📱 Medium Articles")
+                            for article in results['medium']:
+                                st.markdown(article, unsafe_allow_html=True)
+                        
+                        # WordPress Tab
+                        with tabs[2]:
+                            st.subheader("📝 WordPress Content")
+                            for post in results['wordpress']:
+                                st.markdown(post, unsafe_allow_html=True)
+                        
+                        # Research Summary Tab
+                        with tabs[3]:
+                            st.subheader("🔍 Research Summary")
+                            
+                            # Define headers for API calls
+                            headers = {"Authorization": f"Bearer {API_KEY}"}
+                            research_summary = {}  # Dictionary to store all summaries
+                            
+                            # Step 1: Research Focus
+                            with st.spinner("Analyzing Research Focus..."):
+                                focus_prompt = f"""Analyze the research focus for: {search_query}
+                                Provide:
+                                🎯 Research Focus:
+                                - Main topic and scope
+                                - Key research questions"""
+                                
+                                payload = {
+                                    "model": selected_model,
+                                    "messages": [
+                                        {"role": "system", "content": "You are a research analyst focusing on research scope and questions."},
+                                        {"role": "user", "content": focus_prompt}
+                                    ],
+                                    "max_tokens": 1000
+                                }
+                                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                                if response.status_code == 200:
+                                    research_summary['focus'] = response.json()['choices'][0]['message']['content']
+                                    with st.expander("🎯 Research Focus", expanded=True):
+                                        st.markdown(research_summary['focus'])
+
+                            # Step 2: Key Findings
+                            with st.spinner("Analyzing Key Findings..."):
+                                findings_prompt = f"""Analyze the key findings for: {search_query}
+                                Provide:
+                                📊 Key Findings:
+                                - Major discoveries
+                                - Statistical significance
+                                - Research outcomes"""
+                                
+                                payload["messages"][1]["content"] = findings_prompt
+                                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                                if response.status_code == 200:
+                                    research_summary['findings'] = response.json()['choices'][0]['message']['content']
+                                    with st.expander("📊 Key Findings", expanded=True):
+                                        st.markdown(research_summary['findings'])
+
+                            # Step 3: Methodologies
+                            with st.spinner("Analyzing Research Methodologies..."):
+                                methods_prompt = f"""Analyze the research methodologies for: {search_query}
+                                Provide:
+                                🔬 Methodologies:
+                                - Research approaches
+                                - Data collection methods
+                                - Analysis techniques"""
+                                
+                                payload["messages"][1]["content"] = methods_prompt
+                                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                                if response.status_code == 200:
+                                    research_summary['methods'] = response.json()['choices'][0]['message']['content']
+                                    with st.expander("🔬 Methodologies", expanded=True):
+                                        st.markdown(research_summary['methods'])
+
+                            # Step 4: Insights
+                            with st.spinner("Generating Insights..."):
+                                insights_prompt = f"""Generate insights for: {search_query}
+                                Provide:
+                                💡 Insights:
+                                - Main implications
+                                - Practical applications
+                                - Future research directions"""
+                                
+                                payload["messages"][1]["content"] = insights_prompt
+                                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                                if response.status_code == 200:
+                                    research_summary['insights'] = response.json()['choices'][0]['message']['content']
+                                    with st.expander("💡 Insights", expanded=True):
+                                        st.markdown(research_summary['insights'])
+
+                            # Step 5: Critical Analysis
+                            with st.spinner("Performing Critical Analysis..."):
+                                critical_prompt = f"""Provide critical analysis for: {search_query}
+                                Provide:
+                                📌 Critical Analysis:
+                                - Strengths and limitations
+                                - Gaps in research
+                                - Contradicting findings"""
+                                
+                                payload["messages"][1]["content"] = critical_prompt
+                                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                                if response.status_code == 200:
+                                    research_summary['critical'] = response.json()['choices'][0]['message']['content']
+                                    with st.expander("📌 Critical Analysis", expanded=True):
+                                        st.markdown(research_summary['critical'])
+
+                            # Step 6: Conclusions
+                            with st.spinner("Generating Conclusions..."):
+                                conclusions_prompt = f"""Provide conclusions for: {search_query}
+                                Provide:
+                                ✅ Conclusions:
+                                - Summary of findings
+                                - Recommendations
+                                - Future perspectives"""
+                                
+                                payload["messages"][1]["content"] = conclusions_prompt
+                                response = requests.post(f"{API_BASE_URL}/chat/completions", json=payload, headers=headers)
+                                if response.status_code == 200:
+                                    research_summary['conclusions'] = response.json()['choices'][0]['message']['content']
+                                    with st.expander("✅ Conclusions", expanded=True):
+                                        st.markdown(research_summary['conclusions'])
+
+                            # Combine all summaries for the full report
+                            full_research_summary = f"""
+                            # Research Summary: {search_query}
+                            
+                            {research_summary.get('focus', 'Focus analysis not available')}
+                            
+                            {research_summary.get('findings', 'Findings analysis not available')}
+                            
+                            {research_summary.get('methods', 'Methods analysis not available')}
+                            
+                            {research_summary.get('insights', 'Insights analysis not available')}
+                            
+                            {research_summary.get('critical', 'Critical analysis not available')}
+                            
+                            {research_summary.get('conclusions', 'Conclusions not available')}
+                            """
+
+                        # Enhanced Web Analysis with error handling
+                        try:
+                            web_analysis_section = f"""
+                            ## 🌐 Web Analysis
+                            
+                            ### Main Sources
+                            {web_results[:500] if isinstance(web_results, str) else ''.join(web_results[:5])}
+                            
+                            ### Key Topics
+                            {research_summary.get('web_content', 'Web content analysis in progress...')}
+                            """
+                        except Exception as e:
+                            web_analysis_section = "## 🌐 Web Analysis\n\nError processing web analysis."
+                            st.error(f"Web analysis error: {str(e)}")
+
+                        # Enhanced Additional Resources with error handling
+                        try:
+                            # Safely encode search query
+                            encoded_query = requests.utils.quote(search_query)
+                            
+                            # Create database links with error checking
+                            database_links = {
+                                "Google Scholar": f"https://scholar.google.com/scholar?q={encoded_query}",
+                                "Semantic Scholar": f"https://www.semanticscholar.org/search?q={encoded_query}",
+                                "ResearchGate": f"https://www.researchgate.net/search/publication?q={encoded_query}",
+                                "Science Direct": f"https://www.sciencedirect.com/search?qs={encoded_query}",
+                                "PubMed Central": f"https://www.ncbi.nlm.nih.gov/pmc/?term={encoded_query}",
+                                "Springer Link": f"https://link.springer.com/search?query={encoded_query}"
+                            }
+
+                            # Format academic resources section
+                            academic_resources = "\n".join([
+                                f"- [{name}]({url})" for name, url in database_links.items()
+                            ])
+
+                            # Calculate metrics safely
+                            total_sources = sum(len(results.get(source, [])) for source in ['arxiv', 'medium', 'wordpress'])
+                            arxiv_count = len(results.get('arxiv', []))
+                            web_count = len(web_results) if isinstance(web_results, list) else 'Multiple'
+
+                            additional_resources = f"""
+                            ## 🔗 Additional Resources
+                            
+                            ### Academic Databases
+                            {academic_resources}
+                            
+                            ### Research Metrics
+                            - Total Sources Analyzed: {total_sources}
+                            - Academic Papers Found: {arxiv_count}
+                            - Web Articles Found: {web_count}
+                            
+                            Report Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                            """
+                        except Exception as e:
+                            additional_resources = "## 🔗 Additional Resources\n\nError processing additional resources."
+                            st.error(f"Additional resources error: {str(e)}")
+
+                        # Update full report with new sections
+                        full_report = f"""
+                        # Comprehensive Research Report: {search_query}
+                        
+                        {full_research_summary}
+                        
+                        {web_analysis_section}
+                        
+                        {additional_resources}
+                        """
+
+                        # Add HTML formatting for better display
+                        st.markdown("""
+                        <style>
+                        .report-download {
+                            background-color: #4CAF50;
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 5px;
+                            text-decoration: none;
+                            margin: 10px 0;
+                            display: inline-block;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+                        
+                        # Offer multiple download formats
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.download_button(
+                                label="📥 Download Full Report (TXT)",
+                                data=full_report,
+                                file_name=f"research_report_{search_query.replace(' ', '_')}.txt",
+                                mime="text/plain",
+                                key="txt_download"
+                            )
+                        with col2:
+                            st.download_button(
+                                label="📥 Download Full Report (MD)",
+                                data=full_report,
+                                file_name=f"research_report_{search_query.replace(' ', '_')}.md",
+                                mime="text/markdown",
+                                key="md_download"
+                            )
+                        
+                        add_history("Deep Research", search_query, 
+                                  f"Research Report Generated | ArXiv: {len(results['arxiv'])} papers, "
+                                  f"Medium: {len(results['medium'])} articles, "
+                                  f"WordPress: {len(results['wordpress'])} posts")
 
 elif choice == "AI Only":
     st.subheader("AI Only Responses")
