@@ -61,6 +61,7 @@ model_options = [
     "meta-llama/llama-3.1-70b-instruct:free",
     "meta-llama/llama-3.1-405b-instruct:free",
     "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "nousresearch/deephermes-3-llama-3-8b-preview:free",
     "google/gemma-2-9b-it:free",
     "google/gemini-2.0-flash-thinking-exp-1219:free",
     "google/gemini-2.0-flash-exp:free",
@@ -80,7 +81,9 @@ model_options = [
     "microsoft/phi-3-medium-128k-instruct:free",
     "qwen/qwen2.5-vl-72b-instruct:free",
     "qwen/qwen-2-7b-instruct:free",
+    "qwen/qwen-2.5-coder-32b-instruct:free",
     "qwen/qwen-vl-plus:free",
+    "moonshotai/moonlight-16b-a3b-instruct:free",
     "huggingfaceh4/zephyr-7b-beta:free",
     "openchat/openchat-7b:free"
 ]
