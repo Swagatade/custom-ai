@@ -55,13 +55,22 @@ def file_preprocessing(file):
 
 # Model options for summarization and query processing
 model_options = [
+     ## meta-llama models
     "meta-llama/llama-3.3-70b-instruct:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
     "meta-llama/llama-3.2-90b-vision-instruct:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "meta-llama/llama-3.2-1b-instruct:free",
     "meta-llama/llama-3.1-70b-instruct:free",
     "meta-llama/llama-3.1-405b-instruct:free",
+    "meta-llama/llama-3.1-8b-instruct:free",
     "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "meta-llama/llama-3-8b-instruct:free",
     "nousresearch/deephermes-3-llama-3-8b-preview:free",
+     ## gemma models
+    "google/gemma-3-27b-it:free",
+    "google/gemma-3-4b-it:free",
+    "google/gemma-3-12b-it:free",
     "google/gemma-2-9b-it:free",
     "google/gemini-2.0-flash-thinking-exp-1219:free",
     "google/gemini-2.0-flash-exp:free",
@@ -69,23 +78,37 @@ model_options = [
     "google/gemini-2.0-flash-lite-preview-02-05:free",
     "google/learnlm-1.5-pro-experimental:free",
     "google/learnlm-1.5-pro-experimental:free",
+    "google/gemini-exp-1206:free",
+     ## deepseek models
+    "deepseek/deepseek-r1-zero:free",
     "deepseek/deepseek-r1:free",
     "deepseek/deepseek-r1-distill-llama-70b:free",
     "deepseek/deepseek-chat:free",
+    "deepseek/deepseek-r1-distill-qwen-32b:free",
+    "deepseek/deepseek-r1-distill-qwen-14b:free",
+     ## mistral models
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "mistralai/mistral-small-24b-instruct-2501:free",
     "cognitivecomputations/dolphin3.0-mistral-24b:free",
     "mistralai/mistral-nemo:free",
     "mistralai/mistral-7b-instruct:free",
+     ## phi models
     "microsoft/phi-3-mini-128k-instruct:free",
     "microsoft/phi-3-medium-128k-instruct:free",
+     ## qwen models
+    "qwen/qwq-32b:free",
+    "qwen/qwq-32b-preview:free",
     "qwen/qwen2.5-vl-72b-instruct:free",
     "qwen/qwen-2-7b-instruct:free",
     "qwen/qwen-2.5-coder-32b-instruct:free",
     "qwen/qwen-vl-plus:free",
+     ## other models
     "moonshotai/moonlight-16b-a3b-instruct:free",
+    "rekaai/reka-flash-3:free",
     "huggingfaceh4/zephyr-7b-beta:free",
-    "openchat/openchat-7b:free"
+    "openchat/openchat-7b:free",
+    "gryphe/mythomax-l2-13b:free",
+    "undi95/toppy-m-7b:free"
 ]
 selected_model = st.sidebar.selectbox("Choose a Model", model_options)
 
