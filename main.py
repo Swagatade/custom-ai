@@ -71,6 +71,7 @@ model_options = [
     "google/gemma-3-27b-it:free",
     "google/gemma-3-4b-it:free",
     "google/gemma-3-12b-it:free",
+    "google/gemma-3-4b-it:free",,
     "google/gemma-2-9b-it:free",
     "google/gemini-2.0-flash-thinking-exp-1219:free",
     "google/gemini-2.0-flash-exp:free",
