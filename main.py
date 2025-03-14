@@ -69,9 +69,9 @@ model_options = [
     "nousresearch/deephermes-3-llama-3-8b-preview:free",
      ## gemma models
     "google/gemma-3-27b-it:free",
-    "google/gemma-3-4b-it:free",
     "google/gemma-3-12b-it:free",
-    "google/gemma-3-4b-it:free",,
+    "google/gemma-3-4b-it:free",
+    "google/gemma-3-1b-it:free",
     "google/gemma-2-9b-it:free",
     "google/gemini-2.0-flash-thinking-exp-1219:free",
     "google/gemini-2.0-flash-exp:free",
@@ -90,7 +90,7 @@ model_options = [
      ## mistral models
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "mistralai/mistral-small-24b-instruct-2501:free",
-    "cognitivecomputations/dolphin3.0-mistral-24b:free",
+    "cognitivecomputations/dolphin3.0-mistral-24b:free"
     "mistralai/mistral-nemo:free",
     "mistralai/mistral-7b-instruct:free",
      ## phi models
