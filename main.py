@@ -103,6 +103,9 @@ model_options = [
     "qwen/qwen-2-7b-instruct:free",
     "qwen/qwen-2.5-coder-32b-instruct:free",
     "qwen/qwen-vl-plus:free",
+     ## olympiccoder
+    "open-r1/olympiccoder-7b:free",
+    "open-r1/olympiccoder-32b:free",
      ## other models
     "moonshotai/moonlight-16b-a3b-instruct:free",
     "rekaai/reka-flash-3:free",
