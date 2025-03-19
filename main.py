@@ -93,6 +93,7 @@ model_options = [
     "cognitivecomputations/dolphin3.0-mistral-24b:free"
     "mistralai/mistral-nemo:free",
     "mistralai/mistral-7b-instruct:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
      ## phi models
     "microsoft/phi-3-mini-128k-instruct:free",
     "microsoft/phi-3-medium-128k-instruct:free",
