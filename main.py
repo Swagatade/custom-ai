@@ -87,6 +87,7 @@ model_options = [
     "deepseek/deepseek-chat:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
+    "deepseek/deepseek-chat-v3-0324:free",
      ## mistral models
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "mistralai/mistral-small-24b-instruct-2501:free",
