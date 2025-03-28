@@ -73,6 +73,7 @@ model_options = [
     "google/gemma-3-4b-it:free",
     "google/gemma-3-1b-it:free",
     "google/gemma-2-9b-it:free",
+    "google/gemini-2.5-pro-exp-03-25:free",
     "google/gemini-2.0-flash-thinking-exp-1219:free",
     "google/gemini-2.0-flash-exp:free",
     "google/gemini-2.0-flash-thinking-exp:free",
@@ -105,10 +106,13 @@ model_options = [
     "qwen/qwen-2-7b-instruct:free",
     "qwen/qwen-2.5-coder-32b-instruct:free",
     "qwen/qwen-vl-plus:free",
+    "featherless/qwerky-72b:free",
      ## olympiccoder
     "open-r1/olympiccoder-7b:free",
     "open-r1/olympiccoder-32b:free",
      ## other models
+    "bytedance-research/ui-tars-72b:free",
+    "allenai/molmo-7b-d:free",
     "moonshotai/moonlight-16b-a3b-instruct:free",
     "rekaai/reka-flash-3:free",
     "huggingfaceh4/zephyr-7b-beta:free",
