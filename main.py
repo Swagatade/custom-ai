@@ -56,6 +56,8 @@ def file_preprocessing(file):
 # Model options for summarization and query processing
 model_options = [
      ## meta-llama models
+    "meta-llama/llama-4-maverick:free",
+    "meta-llama/llama-4-scout:free",
     "meta-llama/llama-3.3-70b-instruct:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
     "meta-llama/llama-3.2-90b-vision-instruct:free",
@@ -89,6 +91,7 @@ model_options = [
     "deepseek/deepseek-r1-distill-qwen-32b:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-chat-v3-0324:free",
+    "deepseek/deepseek-v3-base:free",
      ## mistral models
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "mistralai/mistral-small-24b-instruct-2501:free",
