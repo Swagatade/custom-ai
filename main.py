@@ -113,6 +113,8 @@ model_options = [
      ## olympiccoder
     "open-r1/olympiccoder-7b:free",
     "open-r1/olympiccoder-32b:free",
+    ## KIMI
+    "moonshotai/kimi-vl-a3b-thinking:free",
      ## other models
     "bytedance-research/ui-tars-72b:free",
     "allenai/molmo-7b-d:free",
