@@ -58,7 +58,9 @@ model_options = [
      ## meta-llama models
     "meta-llama/llama-4-maverick:free",
     "meta-llama/llama-4-scout:free",
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
     "meta-llama/llama-3.3-70b-instruct:free",
+    "nvidia/llama-3.3-nemotron-super-49b-v1:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
     "meta-llama/llama-3.2-90b-vision-instruct:free",
     "meta-llama/llama-3.2-3b-instruct:free",
