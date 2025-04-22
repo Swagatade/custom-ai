@@ -60,6 +60,7 @@ model_options = [
     "meta-llama/llama-4-scout:free",
     "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
     "meta-llama/llama-3.3-70b-instruct:free",
+    "shisa-ai/shisa-v2-llama3.3-70b:free",
     "nvidia/llama-3.3-nemotron-super-49b-v1:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
     "meta-llama/llama-3.2-90b-vision-instruct:free",
@@ -104,6 +105,7 @@ model_options = [
      ## phi models
     "microsoft/phi-3-mini-128k-instruct:free",
     "microsoft/phi-3-medium-128k-instruct:free",
+    "microsoft/mai-ds-r1:free",
      ## qwen models
     "qwen/qwq-32b:free",
     "qwen/qwq-32b-preview:free",
@@ -117,7 +119,11 @@ model_options = [
     "open-r1/olympiccoder-32b:free",
     ## KIMI
     "moonshotai/kimi-vl-a3b-thinking:free",
-     ## other models
+    ## Thudm
+    "thudm/glm-z1-32b:free",
+    "thudm/glm-4-32b:free",
+    ## other models
+    "agentica-org/deepcoder-14b-preview:free",
     "bytedance-research/ui-tars-72b:free",
     "allenai/molmo-7b-d:free",
     "moonshotai/moonlight-16b-a3b-instruct:free",
